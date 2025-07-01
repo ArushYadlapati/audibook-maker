@@ -5,7 +5,7 @@ const Library = () => {
   return (
     <div>
       <Navbar />
-      <div>Library</div>
+      <div>Librar</div>
     </div>
   );
 };
