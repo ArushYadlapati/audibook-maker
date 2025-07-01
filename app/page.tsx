@@ -1,10 +1,14 @@
 import React from "react";
+import Navbar from "./components/Navbar";
+import Introduction from "./components/Intro";
 
 const page = () => {
-  return <div>
-    Audio Book Maker
-    Test
-  </div>;
+  return (
+    <div>
+      <Navbar />
+      <Introduction />
+    </div>
+  );
 };
 
 export default page;
