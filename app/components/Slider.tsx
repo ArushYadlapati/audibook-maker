@@ -4,11 +4,12 @@ import React from "react";
 import Slider from "react-slick";
 import books from "../data/books.json"; // adjust path if needed
 
-function Responsive() {
+function SimpleSlider() {
   const settings = {
     dots: true,
-    infinite: false,
-    speed: 500,
+    infinite: true,
+    autoplay: true,
+    autoplaySpeed: 2500,
     slidesToShow: 5,
     slidesToScroll: 5,
     initialSlide: 0,
@@ -62,4 +63,4 @@ function Responsive() {
   );
 }
 
-export default Responsive;
+export default SimpleSlider;
