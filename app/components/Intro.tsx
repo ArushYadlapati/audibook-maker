@@ -1,7 +1,15 @@
 import React from "react";
+import "slick-carousel/slick/slick.css";
+import "slick-carousel/slick/slick-theme.css";
+import SimpleSlider from "./Slider";
 
-const page = () => {
-  return <div>Introduction: basic intro about what is the web</div>;
-};
-
-export default page;
+export default function page() {
+  var settings = {
+    dots: true,
+    infinite: true,
+    speed: 500,
+    slidesToShow: 1,
+    slidesToScroll: 1,
+  };
+  return <SimpleSlider></SimpleSlider>;
+}
