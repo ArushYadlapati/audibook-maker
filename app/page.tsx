@@ -6,7 +6,7 @@ import "slick-carousel/slick/slick-theme.css";
 
 const page = () => {
   return (
-    <div>
+    <div className="overflow-x-hidden">
       <Navbar />
       <Introduction />
     </div>
