@@ -42,7 +42,7 @@ const Footer = () => {
             </a>
             <a href="#" className="flex flex-col">
               <span className="font-semibold">Arush Y</span>
-              <span>arushyadav@example.com</span>
+              <span>arush.yadlapati@gmail.com</span>
             </a>
           </div>
         </div>
