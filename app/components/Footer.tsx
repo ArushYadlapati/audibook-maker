@@ -34,19 +34,15 @@ const Footer = () => {
 
         {/* Social */}
         <div>
-          <h3 className="text-lg font-semibold mb-2">Follow Us</h3>
-          <div className="flex gap-4">
-            <a href="#">
-              <Facebook className="w-5 h-5 text-gray-400 hover:text-white" />
+          <h3 className="text-lg font-semibold mb-2">Made By</h3>
+          <div className="flex mt-2 flex-col gap-4">
+            <a href="#" className="flex flex-col">
+              <span className="font-semibold">Minh Nguyen</span>
+              <span>khaiminhnguyen1902@gmail.com</span>
             </a>
-            <a href="#">
-              <Twitter className="w-5 h-5 text-gray-400 hover:text-white" />
-            </a>
-            <a href="#">
-              <Instagram className="w-5 h-5 text-gray-400 hover:text-white" />
-            </a>
-            <a href="#">
-              <Linkedin className="w-5 h-5 text-gray-400 hover:text-white" />
+            <a href="#" className="flex flex-col">
+              <span className="font-semibold">Arush Y</span>
+              <span>arushyadav@example.com</span>
             </a>
           </div>
         </div>
