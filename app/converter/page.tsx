@@ -27,6 +27,7 @@ const Converter = () => {
     const [textChunks, setTextChunks] = useState<string[]>([]);
     const [currentChunkIndex, setCurrentChunkIndex] = useState<number>(0);
     const [savedChunkIndex, setSavedChunkIndex] = useState<number>(0); // Track saved position
+    const [isPlaying, setIsPlaying] = useState<boolean>(false);
     const [pdfLib, setPdfLib] = useState<PDFLib | null>(null);
     const [lamejsLib, setLamejsLib] = useState<LameJS | null>(null);
 
@@ -35,12 +36,6 @@ const Converter = () => {
     const recordedChunksRef = useRef<Blob[]>([]);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const processingRef = useRef<boolean>(false); // Prevent multiple simultaneous processing
-
-    let isPlaying = false;
-
-    function setIsPlaying(playing: boolean) {
-        isPlaying = playing;
-    }
 
     useEffect(() => {
         const loadPdfJs = async () => {
@@ -423,26 +418,18 @@ const Converter = () => {
         return filteredChunks.filter(chunk => chunk.length > 0);
     };
 
-    const createAudioFromText = async () => {
-        if (!textChunks.length) {
-            setError('No text chunks available. Please extract text first.');
-            return;
-        }
+    async function generateAudio(playing: boolean) {
+        setIsPlaying(playing);
 
-        if (processingRef.current) {
-            setError('Audio processing already in progress. Please wait.');
+        if (!textChunks.length) {
             return;
         }
 
         processingRef.current = true;
-        setIsConverting(true);
-        setError('');
-        setProgress(0);
-        setCurrentChunkIndex(0);
+        console.log(currentChunkIndex);
         recordedChunksRef.current = [];
 
         try {
-            // Initialize audio context
             audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
                 sampleRate: 44100
             });
@@ -469,7 +456,7 @@ const Converter = () => {
                         throw new Error('No audio data was recorded');
                     }
 
-                    const audioBlob = new Blob(recordedChunksRef.current, { type: 'audio/webm' });
+                    const audioBlob = new Blob(recordedChunksRef.current, {type: 'audio/webm'});
                     console.log(`Created audio blob: ${audioBlob.size} bytes`);
 
                     let finalBlob = audioBlob;
@@ -507,43 +494,13 @@ const Converter = () => {
                 }
             };
 
-            mediaRecorder.onerror = (event) => {
-                console.error('MediaRecorder error:', event);
-                setError('Recording failed. Please try again.');
-                processingRef.current = false;
-                setIsConverting(false);
-            };
 
-            console.log('Starting recording...');
-            mediaRecorder.start(1000); // Collect data every second
-
-            // Process all chunks with improved logic
-            await processAllChunksImproved();
-
-            // Stop recording after processing is complete
-            if (mediaRecorder.state !== 'inactive') {
-                console.log('Stopping MediaRecorder...');
-                mediaRecorder.stop();
-            }
-            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-                audioContextRef.current.close();
-            }
-
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-            console.error('Create audio error:', err);
-            setError(`Failed to create audio: ${errorMessage}`);
-
-            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-                await audioContextRef.current.close();
-            }
-
-            processingRef.current = false;
-            setIsConverting(false);
         }
-    };
+        catch (error) {
+            console.log(error);
+        }
+    }
 
-    // Improved chunk processing with better error handling and progress tracking
     const processAllChunksImproved = (): Promise<void> => {
         return new Promise((resolve, reject) => {
             const totalChunks = textChunks.length;
@@ -597,7 +554,6 @@ const Converter = () => {
                         };
 
                         const handleError = (event: SpeechSynthesisErrorEvent) => {
-                            console.error(`Speech error on chunk ${chunkIndex + 1}:`, event.error);
                             completeChunk();
                         };
 
@@ -681,12 +637,12 @@ const Converter = () => {
         console.log("playing", isPlaying)
         if (isPlaying) {
             speechSynthesis.pause();
-            setIsPlaying(false);
+            generateAudio(false);
         } else if (!isPlaying) {
             speechSynthesis.resume();
-            setIsPlaying(true);
+            generateAudio(true);
         } else {
-            setIsPlaying(true);
+            generateAudio(true);
             // Start from saved position
             playTextLive(savedChunkIndex);
         }
@@ -701,7 +657,7 @@ const Converter = () => {
         const speakChunk = () => {
             // Check if we should stop (either finished or manually stopped)
             if (currentIndex >= textChunks.length) {
-                setIsPlaying(false);
+                generateAudio(false);
                 setSavedChunkIndex(0); // Reset when finished
                 return;
             }
@@ -732,7 +688,7 @@ const Converter = () => {
 
             utterance.onerror = (event) => {
                 console.error('Speech synthesis error:', event);
-                setIsPlaying(false);
+                generateAudio(false);
                 setSavedChunkIndex(currentIndex);
             };
 
@@ -745,21 +701,21 @@ const Converter = () => {
 
     const stopPlayback = () => {
         speechSynthesis.cancel();
-        setIsPlaying(false);
+        generateAudio(false);
         // Save the current position when stopping
         setSavedChunkIndex(currentChunkIndex);
     };
 
     const resetPlayback = () => {
         speechSynthesis.cancel();
-        setIsPlaying(false);
+        generateAudio(false);
         setCurrentChunkIndex(0);
         setSavedChunkIndex(0);
     };
 
     const resetToBeginning = () => {
         speechSynthesis.cancel();
-        setIsPlaying(false);
+        generateAudio(false);
         setCurrentChunkIndex(0);
         setSavedChunkIndex(0);
     };
@@ -946,15 +902,6 @@ const Converter = () => {
                                 >
                                     <Square className="w-4 h-4" />
                                     Stop
-                                </button>
-
-                                <button
-                                    onClick={createAudioFromText}
-                                    disabled={isExtracting || isConverting || isPlaying}
-                                    className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
-                                >
-                                    <Volume2 className="w-4 h-4" />
-                                    {isConverting ? 'Creating & Downloading...' : 'Create & Download MP3'}
                                 </button>
 
                                 {audioBlob && (
