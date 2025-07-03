@@ -4,7 +4,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { AlertCircle, CheckCircle, Download, FileText, Pause, Play,
-         Settings, Square, Upload, Volume2 } from 'lucide-react';
+    Settings, Square, Upload, Volume2 } from 'lucide-react';
 
 import { PDFLib, LameJS, PDFDocumentProxy, PDFPageProxy, LameEncoder } from './convertHandler';
 
@@ -25,9 +25,10 @@ const Converter = () => {
     const [error, setError] = useState<string>('');
     const [success, setSuccess] = useState<string>('');
     const [textChunks, setTextChunks] = useState<string[]>([]);
+    const [isPlaying, setIsPlaying] = useState<boolean>(false);
+    const isPlayingRef = useRef(false);
     const [currentChunkIndex, setCurrentChunkIndex] = useState<number>(0);
     const [savedChunkIndex, setSavedChunkIndex] = useState<number>(0); // Track saved position
-    const [isPlaying, setIsPlaying] = useState<boolean>(false);
     const [pdfLib, setPdfLib] = useState<PDFLib | null>(null);
     const [lamejsLib, setLamejsLib] = useState<LameJS | null>(null);
 
@@ -418,18 +419,21 @@ const Converter = () => {
         return filteredChunks.filter(chunk => chunk.length > 0);
     };
 
-    async function generateAudio(playing: boolean) {
-        setIsPlaying(playing);
 
+    const generateAudio = async () => {
         if (!textChunks.length) {
             return;
         }
 
         processingRef.current = true;
-        console.log(currentChunkIndex);
+        setIsConverting(true);
+        setError('');
+        setProgress(0);
+        setCurrentChunkIndex(0);
         recordedChunksRef.current = [];
 
         try {
+            // Initialize audio context
             audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
                 sampleRate: 44100
             });
@@ -453,10 +457,10 @@ const Converter = () => {
 
                 try {
                     if (recordedChunksRef.current.length === 0) {
-                        throw new Error('No audio data was recorded');
+
                     }
 
-                    const audioBlob = new Blob(recordedChunksRef.current, {type: 'audio/webm'});
+                    const audioBlob = new Blob(recordedChunksRef.current, { type: 'audio/webm' });
                     console.log(`Created audio blob: ${audioBlob.size} bytes`);
 
                     let finalBlob = audioBlob;
@@ -494,13 +498,43 @@ const Converter = () => {
                 }
             };
 
+            mediaRecorder.onerror = (event) => {
+                console.error('MediaRecorder error:', event);
+                setError('Recording failed. Please try again.');
+                processingRef.current = false;
+                setIsConverting(false);
+            };
 
-        }
-        catch (error) {
-            console.log(error);
-        }
-    }
+            console.log('Starting recording...');
+            mediaRecorder.start(1000); // Collect data every second
 
+            // Process all chunks with improved logic
+            await processAllChunksImproved();
+
+            // Stop recording after processing is complete
+            if (mediaRecorder.state !== 'inactive') {
+                console.log('Stopping MediaRecorder...');
+                mediaRecorder.stop();
+            }
+            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                audioContextRef.current.close();
+            }
+
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+            console.error('Create audio error:', err);
+            setError(`Failed to create audio: ${errorMessage}`);
+
+            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                await audioContextRef.current.close();
+            }
+
+            processingRef.current = false;
+            setIsConverting(false);
+        }
+    };
+
+    // Improved chunk processing with better error handling and progress tracking
     const processAllChunksImproved = (): Promise<void> => {
         return new Promise((resolve, reject) => {
             const totalChunks = textChunks.length;
@@ -634,19 +668,12 @@ const Converter = () => {
     };
 
     const playLive = () => {
-        console.log("playing", isPlaying)
-        if (isPlaying) {
-            speechSynthesis.pause();
-            generateAudio(false);
-        } else if (!isPlaying) {
-            speechSynthesis.resume();
-            generateAudio(true);
-        } else {
-            generateAudio(true);
-            // Start from saved position
-            playTextLive(savedChunkIndex);
-        }
+        speechSynthesis.cancel();
+        setIsPlaying(true);
+        isPlayingRef.current = true;
+        playTextLive(savedChunkIndex);
     };
+
 
     const playTextLive = async (startIndex: number = 0) => {
         if (!textChunks.length) return;
@@ -657,13 +684,13 @@ const Converter = () => {
         const speakChunk = () => {
             // Check if we should stop (either finished or manually stopped)
             if (currentIndex >= textChunks.length) {
-                generateAudio(false);
+                setIsPlaying(false);
                 setSavedChunkIndex(0); // Reset when finished
                 return;
             }
 
             // Check if playback was stopped
-            if (!isPlaying) {
+            if (!isPlayingRef) {
                 setSavedChunkIndex(currentIndex);
                 return;
             }
@@ -681,14 +708,13 @@ const Converter = () => {
                 setSavedChunkIndex(currentIndex);
 
                 // Continue to next chunk if still playing
-                if (isPlaying) {
+                if (isPlayingRef) {
                     setTimeout(speakChunk, 10);
                 }
             };
 
             utterance.onerror = (event) => {
-                console.error('Speech synthesis error:', event);
-                generateAudio(false);
+                setIsPlaying(false);
                 setSavedChunkIndex(currentIndex);
             };
 
@@ -701,23 +727,9 @@ const Converter = () => {
 
     const stopPlayback = () => {
         speechSynthesis.cancel();
-        generateAudio(false);
-        // Save the current position when stopping
+        setIsPlaying(false);
+        isPlayingRef.current = false;
         setSavedChunkIndex(currentChunkIndex);
-    };
-
-    const resetPlayback = () => {
-        speechSynthesis.cancel();
-        generateAudio(false);
-        setCurrentChunkIndex(0);
-        setSavedChunkIndex(0);
-    };
-
-    const resetToBeginning = () => {
-        speechSynthesis.cancel();
-        generateAudio(false);
-        setCurrentChunkIndex(0);
-        setSavedChunkIndex(0);
     };
 
     const downloadAudio = () => {
@@ -888,11 +900,11 @@ const Converter = () => {
                             <div className="flex flex-wrap gap-3 mb-4">
                                 <button
                                     onClick={playLive}
-                                    disabled={isExtracting || isConverting}
+                                    disabled={isExtracting || isConverting || isPlaying}
                                     className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
                                 >
-                                    {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                                    {isPlaying ? 'Pause' : !isPlaying ? 'Resume' : 'Play Live'}
+                                    {<Play className="w-4 h-4" />}
+                                    Play
                                 </button>
 
                                 <button
@@ -904,15 +916,24 @@ const Converter = () => {
                                     Stop
                                 </button>
 
-                                {audioBlob && (
-                                    <button
-                                        onClick={downloadAudio}
-                                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
-                                    >
-                                        <Download className="w-4 h-4" />
-                                        Download Again
-                                    </button>
-                                )}
+                                {/*<button*/}
+                                {/*    onClick={generateAudio}*/}
+                                {/*    disabled={isExtracting || isConverting || isPlaying}*/}
+                                {/*    className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"*/}
+                                {/*>*/}
+                                {/*    <Volume2 className="w-4 h-4" />*/}
+                                {/*    {isConverting ? 'Creating & Downloading...' : 'Create & Download MP3'}*/}
+                                {/*</button>*/}
+
+                                {/*{audioBlob && (*/}
+                                {/*    <button*/}
+                                {/*        onClick={downloadAudio}*/}
+                                {/*        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"*/}
+                                {/*    >*/}
+                                {/*        <Download className="w-4 h-4" />*/}
+                                {/*        Download Again*/}
+                                {/*    </button>*/}
+                                {/*)}*/}
                             </div>
 
                             {(isConverting) && (
