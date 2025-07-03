@@ -42,7 +42,6 @@ const Converter = () => {
         isPlaying = playing;
     }
 
-
     useEffect(() => {
         const loadPdfJs = async () => {
             try {
@@ -51,23 +50,22 @@ const Converter = () => {
                     return;
                 }
 
-                const script = document.createElement('script');
-                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+                const script = document.createElement("script");
+                script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
 
                 const loadPromise = new Promise<void>((resolve, reject) => {
                     script.onload = () => resolve();
-                    script.onerror = () => reject(new Error('Failed to load PDF.js'));
                 });
 
                 document.head.appendChild(script);
                 await loadPromise;
 
                 if (window.pdfjsLib) {
-                    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                    window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
                     setPdfLib(window.pdfjsLib);
                 }
             } catch (error) {
-                console.error('Failed to load PDF.js:', error);
+                console.log(error);
             }
         };
 
@@ -82,12 +80,11 @@ const Converter = () => {
                     return;
                 }
 
-                const script = document.createElement('script');
+                const script = document.createElement("script");
                 script.src = 'https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.0/lame.min.js';
 
                 const loadPromise = new Promise<void>((resolve, reject) => {
                     script.onload = () => resolve();
-                    script.onerror = () => reject(new Error('Failed to load Lame.js'));
                 });
 
                 document.head.appendChild(script);
@@ -97,7 +94,7 @@ const Converter = () => {
                     setLamejsLib(window.lamejs);
                 }
             } catch (error) {
-                console.error('Failed to load Lame.js:', error);
+                console.log(error);
             }
         };
 
@@ -593,7 +590,7 @@ const Converter = () => {
                             if (processedChunks < totalChunks) {
                                 setTimeout(() => {
                                     processChunk(processedChunks).then(resolveChunk);
-                                }, 300);
+                                }, 10);
                             } else {
                                 resolveChunk();
                             }
@@ -729,7 +726,7 @@ const Converter = () => {
 
                 // Continue to next chunk if still playing
                 if (isPlaying) {
-                    setTimeout(speakChunk, 100);
+                    setTimeout(speakChunk, 10);
                 }
             };
 
