@@ -3,51 +3,10 @@
 import React, {useEffect, useRef, useState} from 'react';
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import {
-    AlertCircle,
-    CheckCircle,
-    Download,
-    FileText,
-    Pause,
-    Play,
-    Settings,
-    Square,
-    Upload,
-    Volume2
-} from 'lucide-react';
+import { AlertCircle, CheckCircle, Download, FileText, Pause, Play,
+         Settings, Square, Upload, Volume2 } from 'lucide-react';
 
-declare global {
-    interface Window {
-        pdfjsLib?: any;
-        lamejs?: any;
-        JSZip?: any;
-    }
-}
-
-interface PDFDocumentProxy {
-    numPages: number;
-    getPage(pageNumber: number): Promise<PDFPageProxy>;
-}
-
-interface PDFPageProxy {
-    getTextContent(): Promise<{ items: Array<{ str: string }> }>;
-}
-
-interface PDFLib {
-    getDocument(params: { data: ArrayBuffer }): { promise: Promise<PDFDocumentProxy> };
-    GlobalWorkerOptions: {
-        workerSrc: string;
-    };
-}
-
-interface LameEncoder {
-    encodeBuffer(buffer: Int16Array): Uint8Array;
-    flush(): Uint8Array;
-}
-
-interface LameJS {
-    Mp3Encoder: new (channels: number, sampleRate: number, bitRate: number) => LameEncoder;
-}
+import { PDFLib, LameJS, PDFDocumentProxy, PDFPageProxy, LameEncoder } from './convertHandler';
 
 const Converter = () => {
     const [file, setFile] = useState<File | null>(null);
@@ -56,8 +15,6 @@ const Converter = () => {
     const [isConverting, setIsConverting] = useState<boolean>(false);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [audioUrl, setAudioUrl] = useState<string>('');
-    const [isPlaying, setIsPlaying] = useState<boolean>(false);
-    const [isPaused, setIsPaused] = useState<boolean>(false);
     const [currentUtterance, setCurrentUtterance] = useState<SpeechSynthesisUtterance | null>(null);
     const [progress, setProgress] = useState<number>(0);
     const [volume, setVolume] = useState<number>(0.8);
@@ -69,12 +26,22 @@ const Converter = () => {
     const [success, setSuccess] = useState<string>('');
     const [textChunks, setTextChunks] = useState<string[]>([]);
     const [currentChunkIndex, setCurrentChunkIndex] = useState<number>(0);
+    const [savedChunkIndex, setSavedChunkIndex] = useState<number>(0); // Track saved position
     const [pdfLib, setPdfLib] = useState<PDFLib | null>(null);
     const [lamejsLib, setLamejsLib] = useState<LameJS | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
     const recordedChunksRef = useRef<Blob[]>([]);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const processingRef = useRef<boolean>(false); // Prevent multiple simultaneous processing
+
+    let isPlaying = false;
+
+    function setIsPlaying(playing: boolean) {
+        isPlaying = playing;
+    }
+
 
     useEffect(() => {
         const loadPdfJs = async () => {
@@ -180,6 +147,7 @@ const Converter = () => {
         setExtractedText('');
         setProgress(0);
         setCurrentChunkIndex(0);
+        setSavedChunkIndex(0);
     };
 
     const extractTextFromPDF = async (file: File): Promise<string> => {
@@ -211,7 +179,6 @@ const Converter = () => {
 
     const extractTextFromEPUB = async (file: File): Promise<string> => {
         try {
-
             const JSZip = await new Promise<any>((resolve, reject) => {
                 const script = document.createElement('script');
                 script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
@@ -289,54 +256,188 @@ const Converter = () => {
                 text = await extractTextFromTXT(file);
             }
 
+            // Clean up text but preserve structure
             text = text.replace(/\s+/g, ' ').trim();
+
+            if (!text || text.length < 10) {
+                throw new Error('No readable text found in the document');
+            }
 
             setExtractedText(text);
             setSuccess(`Text extracted successfully! (${text.length} characters)`);
 
-            const chunks = splitTextIntoChunks(text, 200);
+            // Improved chunking for better speech synthesis
+            const chunks = splitTextIntoChunks(text);
             setTextChunks(chunks);
+            setCurrentChunkIndex(0);
+            setSavedChunkIndex(0);
+
+            console.log(`Created ${chunks.length} chunks from ${text.length} characters`);
 
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-            setError(errorMessage);
+            setError(`Failed to extract text: ${errorMessage}`);
         } finally {
             setIsExtracting(false);
             setProgress(0);
         }
     };
 
-    const splitTextIntoChunks = (text: string, maxLength: number): string[] => {
-        const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
-        if (sentences.length === 0) {
+    // Improved text chunking function
+    const splitTextIntoChunks = (text: string): string[] => {
+        // Clean the text first - be more aggressive about cleaning
+        const cleanText = text.replace(/\s+/g, ' ')
+            .replace(/[^\w\s.,!?;:()\-'"]/g, '') // Remove problematic characters
+            .trim();
 
-            const words = text.split(' ');
+        if (cleanText.length === 0) {
+            return [];
+        }
+
+        // For very short text, return as single chunk
+        if (cleanText.length < 100) {
+            return [cleanText];
+        }
+
+        // Split by sentences first - improved regex to handle more cases
+        const sentenceRegex = /[.!?]+(?:\s+|$)/g;
+        const sentences = cleanText.split(sentenceRegex)
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+
+        if (sentences.length === 0) {
+            // Fallback: split by paragraphs
+            const paragraphs = cleanText.split(/\n\s*\n/)
+                .map(p => p.trim())
+                .filter(p => p.length > 0);
+
+            if (paragraphs.length > 0) {
+                // Further split long paragraphs
+                const chunks: string[] = [];
+                paragraphs.forEach(paragraph => {
+                    if (paragraph.length <= 500) {
+                        chunks.push(paragraph);
+                    } else {
+                        // Split long paragraphs by sentences or phrases
+                        const phrases = paragraph.split(/[,;:](?:\s+)/)
+                            .map(p => p.trim())
+                            .filter(p => p.length > 0);
+
+                        let currentChunk = '';
+                        phrases.forEach(phrase => {
+                            if (currentChunk.length + phrase.length + 2 <= 500) {
+                                currentChunk += (currentChunk ? ', ' : '') + phrase;
+                            } else {
+                                if (currentChunk) chunks.push(currentChunk);
+                                currentChunk = phrase;
+                            }
+                        });
+                        if (currentChunk) chunks.push(currentChunk);
+                    }
+                });
+                return chunks;
+            }
+
+            // Final fallback: split by word count
+            const words = cleanText.split(' ');
             const chunks: string[] = [];
-            for (let i = 0; i < words.length; i += 30) {
-                chunks.push(words.slice(i, i + 30).join(' '));
+            const wordsPerChunk = 100; // Reduced for more reliable synthesis
+
+            for (let i = 0; i < words.length; i += wordsPerChunk) {
+                const chunk = words.slice(i, i + wordsPerChunk).join(' ');
+                if (chunk.trim()) {
+                    chunks.push(chunk.trim());
+                }
             }
             return chunks;
         }
 
+        // Group sentences into chunks
         const chunks: string[] = [];
         let currentChunk = '';
+        const maxChunkLength = 500; // Reduced from 800 for more reliable synthesis
 
-        for (const sentence of sentences) {
-            if (currentChunk.length + sentence.length <= maxLength) {
-                currentChunk += sentence;
+        for (let i = 0; i < sentences.length; i++) {
+            const sentence = sentences[i].trim();
+            if (!sentence) continue;
+
+            // Add period back if it was removed by split and doesn't end with punctuation
+            const formattedSentence = /[.!?]$/.test(sentence)
+                ? sentence
+                : sentence + '.';
+
+            // Check if adding this sentence would exceed the limit
+            const potentialLength = currentChunk.length + (currentChunk ? 1 : 0) + formattedSentence.length;
+
+            if (potentialLength <= maxChunkLength) {
+                currentChunk += (currentChunk ? ' ' : '') + formattedSentence;
             } else {
-                if (currentChunk.trim()) chunks.push(currentChunk.trim());
-                currentChunk = sentence;
+                // If current chunk is not empty, save it
+                if (currentChunk.trim()) {
+                    chunks.push(currentChunk.trim());
+                }
+
+                // If the sentence itself is too long, split it further
+                if (formattedSentence.length > maxChunkLength) {
+                    const words = formattedSentence.split(' ');
+                    let tempChunk = '';
+
+                    for (const word of words) {
+                        if (tempChunk.length + word.length + 1 <= maxChunkLength) {
+                            tempChunk += (tempChunk ? ' ' : '') + word;
+                        } else {
+                            if (tempChunk) chunks.push(tempChunk);
+                            tempChunk = word;
+                        }
+                    }
+                    currentChunk = tempChunk;
+                } else {
+                    currentChunk = formattedSentence;
+                }
             }
         }
 
-        if (currentChunk.trim()) chunks.push(currentChunk.trim());
-        return chunks.filter(chunk => chunk.length > 0);
+        // Add the last chunk
+        if (currentChunk.trim()) {
+            chunks.push(currentChunk.trim());
+        }
+
+        // Filter out very short chunks and combine them
+        const filteredChunks: string[] = [];
+        let shortChunkBuffer = '';
+
+        for (const chunk of chunks) {
+            if (chunk.length < 50 && shortChunkBuffer.length + chunk.length < maxChunkLength) {
+                shortChunkBuffer += (shortChunkBuffer ? ' ' : '') + chunk;
+            } else {
+                if (shortChunkBuffer) {
+                    filteredChunks.push(shortChunkBuffer);
+                    shortChunkBuffer = '';
+                }
+                filteredChunks.push(chunk);
+            }
+        }
+
+        if (shortChunkBuffer) {
+            filteredChunks.push(shortChunkBuffer);
+        }
+
+        console.log(`Text chunking complete: ${cleanText.length} chars -> ${filteredChunks.length} chunks`);
+        return filteredChunks.filter(chunk => chunk.length > 0);
     };
 
     const createAudioFromText = async () => {
-        if (!textChunks.length) return;
+        if (!textChunks.length) {
+            setError('No text chunks available. Please extract text first.');
+            return;
+        }
 
+        if (processingRef.current) {
+            setError('Audio processing already in progress. Please wait.');
+            return;
+        }
+
+        processingRef.current = true;
         setIsConverting(true);
         setError('');
         setProgress(0);
@@ -344,37 +445,49 @@ const Converter = () => {
         recordedChunksRef.current = [];
 
         try {
-
+            // Initialize audio context
             audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
                 sampleRate: 44100
             });
 
             const destination = audioContextRef.current.createMediaStreamDestination();
-
             const mediaRecorder = new MediaRecorder(destination.stream, {
                 mimeType: 'audio/webm;codecs=opus'
             });
 
+            mediaRecorderRef.current = mediaRecorder;
+
             mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
                     recordedChunksRef.current.push(event.data);
+                    console.log(`Recorded chunk: ${event.data.size} bytes`);
                 }
             };
 
             mediaRecorder.onstop = async () => {
+                console.log(`Recording stopped. Total chunks: ${recordedChunksRef.current.length}`);
+
                 try {
+                    if (recordedChunksRef.current.length === 0) {
+                        throw new Error('No audio data was recorded');
+                    }
+
                     const audioBlob = new Blob(recordedChunksRef.current, { type: 'audio/webm' });
+                    console.log(`Created audio blob: ${audioBlob.size} bytes`);
 
                     let finalBlob = audioBlob;
                     let fileName = `${file?.name?.replace(/\.[^/.]+$/, '') || 'converted'}_audio`;
 
-                    if (lamejsLib) {
+                    if (lamejsLib && audioBlob.size > 0) {
                         try {
+                            console.log('Converting to MP3...');
                             finalBlob = await convertToMp3(audioBlob);
                             fileName += '.mp3';
+                            console.log(`MP3 conversion successful: ${finalBlob.size} bytes`);
                         } catch (mp3Error) {
                             console.warn('MP3 conversion failed, using original format:', mp3Error);
                             fileName += '.webm';
+                            finalBlob = audioBlob;
                         }
                     } else {
                         fileName += '.webm';
@@ -389,69 +502,134 @@ const Converter = () => {
                     setSuccess('Audio created and downloaded successfully!');
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    console.error('Audio processing error:', error);
                     setError(`Failed to process audio: ${errorMessage}`);
+                } finally {
+                    processingRef.current = false;
+                    setIsConverting(false);
                 }
             };
 
-            mediaRecorder.start();
+            mediaRecorder.onerror = (event) => {
+                console.error('MediaRecorder error:', event);
+                setError('Recording failed. Please try again.');
+                processingRef.current = false;
+                setIsConverting(false);
+            };
 
-            await processAllChunks();
+            console.log('Starting recording...');
+            mediaRecorder.start(1000); // Collect data every second
 
-            setTimeout(() => {
+            // Process all chunks with improved logic
+            await processAllChunksImproved();
+
+            // Stop recording after processing is complete
+            if (mediaRecorder.state !== 'inactive') {
+                console.log('Stopping MediaRecorder...');
                 mediaRecorder.stop();
-                if (audioContextRef.current) {
-                    audioContextRef.current.close();
-                }
-            }, 500);
+            }
+            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                audioContextRef.current.close();
+            }
 
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+            console.error('Create audio error:', err);
             setError(`Failed to create audio: ${errorMessage}`);
-            if (audioContextRef.current) {
+
+            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
                 await audioContextRef.current.close();
             }
-        } finally {
+
+            processingRef.current = false;
             setIsConverting(false);
         }
     };
 
-    const processAllChunks = (): Promise<void> => {
+    // Improved chunk processing with better error handling and progress tracking
+    const processAllChunksImproved = (): Promise<void> => {
         return new Promise((resolve, reject) => {
-            let chunkIndex = 0;
+            const totalChunks = textChunks.length;
+            let processedChunks = 0;
 
-            const processNextChunk = () => {
-                if (chunkIndex >= textChunks.length) {
-                    resolve();
-                    return;
-                }
+            console.log(`Starting to process ${totalChunks} chunks`);
 
-                const utterance = new SpeechSynthesisUtterance(textChunks[chunkIndex]);
-
-                if (voice) utterance.voice = voice;
-                utterance.rate = rate;
-                utterance.pitch = pitch;
-                utterance.volume = volume;
-
-                utterance.onend = () => {
-                    chunkIndex++;
-                    setCurrentChunkIndex(chunkIndex);
-                    setProgress((chunkIndex / textChunks.length) * 100);
-
-                    if (chunkIndex < textChunks.length) {
-                        setTimeout(processNextChunk, 100);
-                    } else {
+            const processChunk = (chunkIndex: number): Promise<void> => {
+                return new Promise((resolveChunk) => {
+                    if (chunkIndex >= totalChunks) {
+                        console.log('All chunks processed successfully');
                         resolve();
+                        return;
                     }
-                };
 
-                utterance.onerror = (event) => {
-                    reject(new Error(`Speech synthesis error: ${event.error}`));
-                };
+                    const chunkText = textChunks[chunkIndex];
+                    console.log(`Processing chunk ${chunkIndex + 1}/${totalChunks}: ${chunkText.substring(0, 50)}...`);
 
-                speechSynthesis.speak(utterance);
+                    // Cancel any previous speech
+                    speechSynthesis.cancel();
+
+                    // Short delay to ensure clean state
+                    setTimeout(() => {
+                        const utterance = new SpeechSynthesisUtterance(chunkText);
+
+                        if (voice) utterance.voice = voice;
+                        utterance.rate = rate;
+                        utterance.pitch = pitch;
+                        utterance.volume = volume;
+
+                        let hasCompleted = false;
+
+                        const completeChunk = () => {
+                            if (hasCompleted) return;
+                            hasCompleted = true;
+
+                            processedChunks++;
+                            setCurrentChunkIndex(processedChunks);
+                            setProgress((processedChunks / totalChunks) * 100);
+
+                            console.log(`Completed chunk ${processedChunks}/${totalChunks}`);
+
+                            // Process next chunk
+                            if (processedChunks < totalChunks) {
+                                setTimeout(() => {
+                                    processChunk(processedChunks).then(resolveChunk);
+                                }, 300);
+                            } else {
+                                resolveChunk();
+                            }
+                        };
+
+                        const handleError = (event: SpeechSynthesisErrorEvent) => {
+                            console.error(`Speech error on chunk ${chunkIndex + 1}:`, event.error);
+                            completeChunk();
+                        };
+
+                        // Safety timeout
+                        const timeoutDuration = Math.max((chunkText.length / 8) * (1 / rate) * 1000, 5000);
+                        const timeoutId = setTimeout(() => {
+                            console.warn(`Chunk ${chunkIndex + 1} timed out`);
+                            speechSynthesis.cancel();
+                            completeChunk();
+                        }, timeoutDuration);
+
+                        utterance.onend = () => {
+                            clearTimeout(timeoutId);
+                            completeChunk();
+                        };
+
+                        utterance.onerror = (event) => {
+                            clearTimeout(timeoutId);
+                            handleError(event);
+                        };
+
+                        speechSynthesis.speak(utterance);
+
+                    }, 200);
+                });
             };
 
-            processNextChunk();
+            // Start processing from chunk 0
+            processChunk(0);
         });
     };
 
@@ -503,36 +681,41 @@ const Converter = () => {
     };
 
     const playLive = () => {
+        console.log("playing", isPlaying)
         if (isPlaying) {
             speechSynthesis.pause();
-            setIsPaused(true);
             setIsPlaying(false);
-        } else if (isPaused) {
+        } else if (!isPlaying) {
             speechSynthesis.resume();
-            setIsPaused(false);
             setIsPlaying(true);
         } else {
-
             setIsPlaying(true);
-            setIsPaused(false);
-            playTextLive();
+            // Start from saved position
+            playTextLive(savedChunkIndex);
         }
     };
 
-    const playTextLive = async () => {
+    const playTextLive = async (startIndex: number = 0) => {
         if (!textChunks.length) return;
 
-        let chunkIndex = 0;
-        setCurrentChunkIndex(0);
+        let currentIndex = startIndex;
+        setCurrentChunkIndex(currentIndex);
 
         const speakChunk = () => {
-            if (chunkIndex >= textChunks.length) {
+            // Check if we should stop (either finished or manually stopped)
+            if (currentIndex >= textChunks.length) {
                 setIsPlaying(false);
-                setIsPaused(false);
+                setSavedChunkIndex(0); // Reset when finished
                 return;
             }
 
-            const utterance = new SpeechSynthesisUtterance(textChunks[chunkIndex]);
+            // Check if playback was stopped
+            if (!isPlaying) {
+                setSavedChunkIndex(currentIndex);
+                return;
+            }
+
+            const utterance = new SpeechSynthesisUtterance(textChunks[currentIndex]);
 
             if (voice) utterance.voice = voice;
             utterance.rate = rate;
@@ -540,19 +723,20 @@ const Converter = () => {
             utterance.volume = volume;
 
             utterance.onend = () => {
-                chunkIndex++;
-                setCurrentChunkIndex(chunkIndex);
-                if (isPlaying && chunkIndex < textChunks.length) {
+                currentIndex++;
+                setCurrentChunkIndex(currentIndex);
+                setSavedChunkIndex(currentIndex);
+
+                // Continue to next chunk if still playing
+                if (isPlaying) {
                     setTimeout(speakChunk, 100);
-                } else {
-                    setIsPlaying(false);
-                    setIsPaused(false);
                 }
             };
 
             utterance.onerror = (event) => {
+                console.error('Speech synthesis error:', event);
                 setIsPlaying(false);
-                setIsPaused(false);
+                setSavedChunkIndex(currentIndex);
             };
 
             setCurrentUtterance(utterance);
@@ -565,8 +749,22 @@ const Converter = () => {
     const stopPlayback = () => {
         speechSynthesis.cancel();
         setIsPlaying(false);
-        setIsPaused(false);
+        // Save the current position when stopping
+        setSavedChunkIndex(currentChunkIndex);
+    };
+
+    const resetPlayback = () => {
+        speechSynthesis.cancel();
+        setIsPlaying(false);
         setCurrentChunkIndex(0);
+        setSavedChunkIndex(0);
+    };
+
+    const resetToBeginning = () => {
+        speechSynthesis.cancel();
+        setIsPlaying(false);
+        setCurrentChunkIndex(0);
+        setSavedChunkIndex(0);
     };
 
     const downloadAudio = () => {
@@ -629,7 +827,10 @@ const Converter = () => {
                     {(isExtracting || isConverting) && (
                         <div className="mb-6">
                             <div className="flex justify-between text-sm text-gray-600 mb-2">
-                                <span>{isExtracting ? 'Extracting text...' : 'Converting to audio...'}</span>
+                                <span>
+                                    {isExtracting ? 'Extracting text...' :
+                                        `Converting to audio... (${currentChunkIndex}/${textChunks.length} segments)`}
+                                </span>
                                 <span>{Math.round(progress)}%</span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
@@ -648,7 +849,7 @@ const Converter = () => {
                                 disabled={isExtracting}
                                 className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
                             >
-                                { isExtracting ? 'Converting...' : 'Convert to Audiobook' }
+                                {isExtracting ? 'Extracting...' : 'Extract Text'}
                             </button>
                         </div>
                     )}
@@ -718,11 +919,11 @@ const Converter = () => {
                         <div className="mb-6">
                             <h3 className="text-lg font-semibold mb-2">Text Preview</h3>
                             <div className="bg-gray-100 p-4 rounded-lg max-h-40 overflow-y-auto text-sm">
-                                {extractedText.substring(0, 500)}
-                                {extractedText.length > 500 && '...'}
+                                {extractedText.substring(0, 1000)}
+                                {extractedText.length > 1000 && '...'}
                             </div>
                             <p className="text-xs text-gray-500 mt-2">
-                                {extractedText.length} characters | {textChunks.length} speech segments
+                                {extractedText.length.toLocaleString()} characters | {textChunks.length} speech segments
                             </p>
                         </div>
                     )}
@@ -738,12 +939,12 @@ const Converter = () => {
                                     className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
                                 >
                                     {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                                    {isPlaying ? 'Pause' : isPaused ? 'Resume' : 'Play Live'}
+                                    {isPlaying ? 'Pause' : !isPlaying ? 'Resume' : 'Play Live'}
                                 </button>
 
                                 <button
                                     onClick={stopPlayback}
-                                    disabled={!isPlaying && !isPaused}
+                                    disabled={!isPlaying}
                                     className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
                                 >
                                     <Square className="w-4 h-4" />
@@ -770,9 +971,9 @@ const Converter = () => {
                                 )}
                             </div>
 
-                            {(isPlaying || isPaused || isConverting) && (
+                            {(isConverting) && (
                                 <div className="text-sm text-gray-600 bg-white p-3 rounded border">
-                                    <p><strong>Status:</strong> {isPlaying ? 'Playing' : isPaused ? 'Paused' : 'Converting'}</p>
+                                    <p><strong>Status:</strong> {isPlaying ? 'Playing' : !isPlaying ? 'Paused' : 'Converting'}</p>
                                     {textChunks.length > 0 && (
                                         <p><strong>Progress:</strong> {currentChunkIndex} / {textChunks.length} segments</p>
                                     )}
