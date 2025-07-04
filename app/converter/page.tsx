@@ -12,8 +12,8 @@ const Converter = () => {
     const [extractedText, setExtractedText] = useState<string>("");
     const [isExtracting, setIsExtracting] = useState<boolean>(false);
     const [, setAudioBlob] = useState<Blob | null>(null);
-    const [audioUrl, setAudioUrl] = useState<string>('');
-    const [currentUtterance, setCurrentUtterance] = useState<SpeechSynthesisUtterance | null>(null);
+    const [, setAudioUrl] = useState<string>('');
+    const [, setCurrentUtterance] = useState<SpeechSynthesisUtterance | null>(null);
     const [progress, setProgress] = useState<number>(0);
     const [volume, setVolume] = useState<number>(0.8);
     const [rate, setRate] = useState<number>(1);
@@ -29,7 +29,8 @@ const Converter = () => {
     const [savedChunkIndex, setSavedChunkIndex] = useState<number>(0);
     const [pdfLib, setPdfLib] = useState<PDFLib | null>(null);
     const [, setLamejsLib] = useState<LameJS | null>(null);
-    const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
+    const [, setCurrentWordIndex] = useState<number>(0);
+    const [highlightedText, setHighlightedText] = useState<string>("");
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -112,6 +113,12 @@ const Converter = () => {
         setTimeout(loadVoices, 100);
     }, [voice]);
 
+    useEffect(() => {
+        if (textChunks.length > 0 && currentChunkIndex < textChunks.length) {
+            updateHighlightedText(currentChunkIndex, 0);
+        }
+    }, [currentChunkIndex, textChunks]);
+
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const uploadedFile = event.target.files?.[0];
         if (!uploadedFile) return;
@@ -137,6 +144,7 @@ const Converter = () => {
         setCurrentChunkIndex(0);
         setSavedChunkIndex(0);
         setCurrentWordIndex(0);
+        setHighlightedText('');
     };
 
     const extractTextFromPDF = async (file: File): Promise<string> => {
@@ -319,6 +327,37 @@ const Converter = () => {
         return chunks;
     };
 
+    const updateHighlightedText = (chunkIndex: number, wordIndex: number) => {
+        if (chunkIndex >= textChunks.length) return;
+
+        const chunk = textChunks[chunkIndex];
+        const words = chunk.split(/(\s+)/);
+        const actualWords = words.filter(word => word.trim().length > 0);
+
+        if (wordIndex >= actualWords.length) {
+            setHighlightedText(chunk);
+            return;
+        }
+
+        let highlightedHtml = '';
+        let actualWordIndex = 0;
+
+        for (let i = 0; i < words.length; i++) {
+            const word = words[i];
+            if (word.trim().length > 0) {
+                if (actualWordIndex === wordIndex) {
+                    highlightedHtml += `<span class="bg-yellow-300 font-bold">${word}</span>`;
+                } else {
+                    highlightedHtml += word;
+                }
+                actualWordIndex++;
+            } else {
+                highlightedHtml += word;
+            }
+        }
+
+        setHighlightedText(highlightedHtml);
+    };
 
     const togglePlayback = () => {
         if (isPlaying) {
@@ -364,6 +403,15 @@ const Converter = () => {
             utterance.pitch = pitch;
             utterance.volume = volume;
 
+            let wordIndex = 0;
+            utterance.onboundary = (event) => {
+                if (event.name === 'word') {
+                    setCurrentWordIndex(wordIndex);
+                    updateHighlightedText(currentIndex, wordIndex);
+                    wordIndex++;
+                }
+            };
+
             utterance.onend = () => {
                 currentIndex++;
                 setCurrentChunkIndex(currentIndex);
@@ -394,6 +442,10 @@ const Converter = () => {
         isPlayingRef.current = false;
         setSavedChunkIndex(currentChunkIndex);
         setCurrentWordIndex(0);
+
+        if (currentChunkIndex < textChunks.length) {
+            updateHighlightedText(currentChunkIndex, 0);
+        }
     };
 
     const skipBackward = () => {
@@ -405,8 +457,10 @@ const Converter = () => {
         if (isPlaying) {
             speechSynthesis.cancel();
             setTimeout(() => {
-                playTextLive(newIndex);
+                playTextLive(newIndex).then();
             }, 100);
+        } else {
+            updateHighlightedText(newIndex, 0);
         }
     };
 
@@ -419,8 +473,10 @@ const Converter = () => {
         if (isPlaying) {
             speechSynthesis.cancel();
             setTimeout(() => {
-                playTextLive(newIndex);
+                playTextLive(newIndex).then();
             }, 100);
+        } else {
+            updateHighlightedText(newIndex, 0);
         }
     };
 
@@ -559,9 +615,14 @@ const Converter = () => {
                         <div className="mb-6">
                             <h3 className="text-lg font-semibold mb-2">Book</h3>
                             <div className="bg-gray-100 p-4 rounded-lg max-h-60 overflow-y-auto text-sm">
-                                <div className="leading-relaxed">
-                                    {extractedText}
-                                </div>
+                                {highlightedText ? (
+                                    <div
+                                        dangerouslySetInnerHTML={{ __html: highlightedText }}
+                                        className="leading-relaxed"
+                                    />
+                                ) : (
+                                    <div className="leading-relaxed">{extractedText}</div>
+                                )}
                             </div>
                             <p className="text-xs text-gray-500 mt-2">
                                 {extractedText.length.toLocaleString()} characters | {textChunks.length} speech segments
