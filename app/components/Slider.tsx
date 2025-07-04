@@ -15,17 +15,10 @@ type Book = {
 const books: Book[] = rawBooks as Book[];
 
 function SimpleSlider() {
-  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [flippedBookId, setFlippedBookId] = useState<number | null>(null);
 
-  const openModal = (book: Book) => {
-    setSelectedBook(book);
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setSelectedBook(null);
-    setIsModalOpen(false);
+  const toggleFlip = (bookId: number) => {
+    setFlippedBookId(flippedBookId === bookId ? null : bookId);
   };
 
   const settings = {
@@ -68,47 +61,51 @@ function SimpleSlider() {
     <div className="slider-container p-4">
       <Slider {...settings}>
         {books.map((book) => (
-          <div key={book.id} className="p-2" onClick={() => openModal(book)}>
-            <div className="rounded overflow-hidden shadow-lg cursor-pointer hover:scale-105 transition-transform duration-200">
-              <img
-                src={book.imageUrl}
-                alt={book.title}
-                className="w-full h-[300px] object-cover"
-              />
-              <div className="px-4 py-2 bg-black text-white text-center">
-                <h3 className="text-lg font-semibold">{book.title}</h3>
+          <div key={book.id} className="p-2">
+            <div
+              className="relative w-full h-[350px] cursor-pointer"
+              onClick={() => toggleFlip(book.id)}
+            >
+              <div
+                className={`relative w-full h-full transition-transform duration-500 transform-style-preserve-3d ${
+                  flippedBookId === book.id ? "rotate-y-180" : ""
+                }`}
+                style={{ transformStyle: "preserve-3d" }}
+              >
+                {/* Front of the card */}
+                <div className="absolute w-full h-full backface-hidden rounded overflow-hidden shadow-lg hover:scale-105 transition-transform duration-200">
+                  <img
+                    src={book.imageUrl}
+                    alt={book.title}
+                    className="w-full h-[300px] object-cover"
+                  />
+                  <div className="px-4 py-2 bg-black text-white text-center">
+                    <h3 className="text-lg font-semibold">{book.title}</h3>
+                  </div>
+                </div>
+                {/* Back of the card */}
+                <div className="absolute w-full h-full backface-hidden rotate-y-180 bg-white rounded-lg shadow-lg p-4 flex flex-col justify-center items-center">
+                  <h2 className="text-xl font-semibold mb-2 text-center">
+                    {book.title}
+                  </h2>
+                  <p className="text-gray-700 mb-1">
+                    <strong>Author:</strong> {book.author}
+                  </p>
+                  <p className="text-gray-700 mb-4">
+                    <strong>Genre:</strong> {book.genre}
+                  </p>
+                  <button
+                    className="cursor-pointer bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900"
+                    onClick={() => toggleFlip(book.id)}
+                  >
+                    Back to Cover
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         ))}
       </Slider>
-
-      {isModalOpen && selectedBook && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl relative">
-            <button
-              className="absolute top-2 right-2 text-xl font-bold text-gray-700 hover:text-black"
-              onClick={closeModal}
-            >
-              &times;
-            </button>
-            <img
-              src={selectedBook.imageUrl}
-              alt={selectedBook.title}
-              className="w-full h-[600px] object-cover rounded mb-4"
-            />
-            <h2 className="text-2xl font-semibold mb-2">
-              {selectedBook.title}
-            </h2>
-            <p className="text-gray-700 mb-1">
-              <strong>Author:</strong> {selectedBook.author}
-            </p>
-            <p className="text-gray-700">
-              <strong>Genre:</strong> {selectedBook.genre}
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
