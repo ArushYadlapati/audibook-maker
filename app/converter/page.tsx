@@ -32,9 +32,6 @@ const Converter = () => {
     const [, setLamejsLib] = useState<LameJS | null>(null);
     const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
     const [highlightedText, setHighlightedText] = useState<string>("");
-    const [bookTitle, setBookTitle] = useState<string>("");
-    const [bookAuthor, setBookAuthor] = useState<string>("");
-    const [bookCoverUrl, setBookCoverUrl] = useState<string>("");
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -132,78 +129,149 @@ const Converter = () => {
         const fileName = uploadedFile.name.toLowerCase();
         const validTypes = [".pdf", ".epub", ".txt"];
         const isValidType = validTypes.some(type => fileName.endsWith(type)) ||
-            uploadedFile.type.includes("pdf") ||
-            uploadedFile.type.includes("text");
+            uploadedFile.type.includes('pdf') ||
+            uploadedFile.type.includes('text');
 
         if (!isValidType) {
+            setError('Please upload a PDF, EPUB, or TXT file');
             return;
         }
 
         setFile(uploadedFile);
-        setError("");
-        setSuccess("");
-        setAudioUrl("");
+        setError('');
+        setSuccess('');
+        setAudioUrl('');
         setAudioBlob(null);
-        setExtractedText("");
+        setExtractedText('');
         setProgress(0);
         setCurrentChunkIndex(0);
         setSavedChunkIndex(0);
         setSavedWordIndex(0);
         setCurrentWordIndex(0);
-        setHighlightedText("");
-        setBookTitle("");
-        setBookAuthor("");
-        setBookCoverUrl("");
+        setHighlightedText('');
     };
 
-    const processFile = async () => {
-        if (!file) {
-            return;
+    const extractTextFromPDF = async (file: File): Promise<string> => {
+        if (!pdfLib) {
+            return "";
         }
 
-        setIsExtracting(true);
-        setError("");
-        setSuccess("");
-        setProgress(0);
-
-        const formData = new FormData();
-        formData.append("bookFile", file); // Send the file to the backend
-
         try {
-            const response = await fetch("http://localhost:5000/api/upload-book", { // IMPORTANT: Update this URL for production
-                method: "POST",
-                body: formData,
-            });
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfLib.getDocument({ data: arrayBuffer }).promise;
 
-            const result = await response.json();
-            const { extractedText, extractedTitle, extractedAuthor, coverFileId } = result;
+            let fullText = '';
+            const totalPages = pdf.numPages;
 
-            setExtractedText(extractedText);
-            setBookTitle(extractedTitle);
-            setBookAuthor(extractedAuthor);
+            for (let i = 1; i <= totalPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += pageText + '\n\n';
 
-            if (coverFileId) {
-                // Construct URL for the cover image endpoint
-                setBookCoverUrl(`http://localhost:5000/api/book-cover/${coverFileId}`); // IMPORTANT: Update this URL for production
-            } else {
-                setBookCoverUrl("");
+                setProgress((i / totalPages) * 100);
             }
 
-            setSuccess(`Book processed successfully! Title: ${extractedTitle || 'N/A'}, Author: ${extractedAuthor || 'N/A'}`);
+            return fullText.trim();
+        } catch (error) {
+            return "";
+        }
+    };
 
-            const chunks = splitTextIntoChunks(extractedText); // Use text extracted by backend
+    const extractTextFromEPUB = async (file: File): Promise<string> => {
+        try {
+            const JSZip = await new Promise<any>((resolve) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+                script.onload = () => {
+                    if (window.JSZip) {
+                        resolve(window.JSZip);
+                    }
+                };
+
+                document.head.appendChild(script);
+            });
+
+            const zip = new JSZip();
+            const contents = await zip.loadAsync(file);
+
+            let fullText = '';
+            const htmlFiles: string[] = [];
+
+            contents.forEach((relativePath: string, zipEntry: any) => {
+                if (relativePath.match(/\.(html|xhtml|htm)$/i) && !zipEntry.dir) {
+                    htmlFiles.push(relativePath);
+                }
+            });
+
+            htmlFiles.sort();
+
+            for (let i = 0; i < htmlFiles.length; i++) {
+                const htmlContent = await contents.file(htmlFiles[i]).async('string');
+
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = htmlContent;
+
+                const scripts = tempDiv.querySelectorAll('script, style');
+                scripts.forEach(el => el.remove());
+
+                const text = tempDiv.textContent || tempDiv.innerText || '';
+                fullText += text + '\n\n';
+
+                setProgress(((i + 1) / htmlFiles.length) * 100);
+            }
+
+            return fullText.trim();
+        } catch (error) {
+            return "";
+        }
+    };
+
+    const extractTextFromTXT = async (file: File): Promise<string> => {
+        try {
+            return await file.text();
+        } catch (error) {
+            return "";
+        }
+    };
+
+    const extractText = async () => {
+        if (!file) return;
+
+        setIsExtracting(true);
+        setError('');
+        setSuccess('');
+        setProgress(0);
+
+        try {
+            let text = '';
+            const fileName = file.name.toLowerCase();
+
+            if (file.type.includes('pdf') || fileName.endsWith('.pdf')) {
+                text = await extractTextFromPDF(file);
+            } else if (fileName.endsWith('.epub')) {
+                text = await extractTextFromEPUB(file);
+            } else if (fileName.endsWith('.txt') || file.type.includes('text')) {
+                text = await extractTextFromTXT(file);
+            }
+
+            text = cleanText(text);
+
+            setExtractedText(text);
+            setSuccess(`Text extracted successfully! (${text.length} characters)`);
+
+            const chunks = splitTextIntoChunks(text);
             setTextChunks(chunks);
             setCurrentChunkIndex(0);
             setSavedChunkIndex(0);
             setSavedWordIndex(0);
             setCurrentWordIndex(0);
 
-            console.log(`Created ${chunks.length} chunks from ${extractedText.length} characters`);
+            console.log(`Created ${chunks.length} chunks from ${text.length} characters`);
 
-            }
-        catch (err) {
+        } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-            setError(`Failed to process book: ${errorMessage}`);
+            setError(`Failed to extract text: ${errorMessage}`);
         } finally {
             setIsExtracting(false);
             setProgress(0);
@@ -272,14 +340,14 @@ const Converter = () => {
 
             if (i === currentChunkIndex && isPlaying) {
                 const words = chunk.split(/(\s+)/);
-                // const actualWords = words.filter(word => word.trim().length > 0); // This was previously used, but affects index
+                // const actualWords = words.filter(word => word.trim().length > 0);
 
                 let highlightedChunk = '';
-                let actualWordIndex = 0; // Tracks index of actual words (non-whitespace)
+                let actualWordIndex = 0;
 
                 for (let j = 0; j < words.length; j++) {
                     const word = words[j];
-                    if (word.trim().length > 0) { // Check if it's an actual word
+                    if (word.trim().length > 0) {
                         if (actualWordIndex === currentWordIndex) {
                             highlightedChunk += `<span class="bg-yellow-300 font-bold">${word}</span>`;
                         } else {
@@ -287,27 +355,25 @@ const Converter = () => {
                         }
                         actualWordIndex++;
                     } else {
-                        highlightedChunk += word; // Keep whitespace as is
+                        highlightedChunk += word;
                     }
                 }
 
                 fullHighlightedText += highlightedChunk;
             } else if (i === currentChunkIndex && !isPlaying) {
-                // Highlight the entire current chunk when paused
                 fullHighlightedText += `<span class="bg-blue-100 font-medium">${chunk}</span>`;
             } else {
                 fullHighlightedText += chunk;
             }
 
             if (i < textChunks.length - 1) {
-                fullHighlightedText += ' '; // Add space between chunks if not the last
+                fullHighlightedText += ' ';
             }
         }
 
         return fullHighlightedText;
     };
 
-    // --- Playback Controls (Unchanged) ---
     const togglePlayback = () => {
         if (isPlaying) {
             stopPlayback();
@@ -346,29 +412,16 @@ const Converter = () => {
             }
 
             const chunk = textChunks[currentIndex];
-            // Split by whitespace to get words and preserve delimiters for highlighting
-            const words = chunk.split(/(\s+)/);
+            const words = chunk.split(/(\s+)/).filter(word => word.trim().length > 0);
 
-            let textToSpeak = chunk; // Default: speak the entire chunk
-            let wordOffset = 0; // The actual word index offset if skipping
+            let textToSpeak = chunk;
+            let wordOffset = 0;
 
-            // If we are skipping to a specific word, reconstruct the text to speak from that word onwards
             if (skipToWord > 0) {
-                let actualWordCount = 0;
-                let startIndexInWordsArray = 0;
-                for (let i = 0; i < words.length; i++) {
-                    if (words[i].trim().length > 0) { // If it's an actual word
-                        if (actualWordCount === skipToWord) {
-                            startIndexInWordsArray = i;
-                            break;
-                        }
-                        actualWordCount++;
-                    }
-                }
-                textToSpeak = words.slice(startIndexInWordsArray).join('');
+                const wordsToSpeak = words.slice(skipToWord);
+                textToSpeak = wordsToSpeak.join(' ');
                 wordOffset = skipToWord;
             }
-
 
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
 
@@ -380,9 +433,6 @@ const Converter = () => {
             let wordIndex = wordOffset;
             utterance.onboundary = (event) => {
                 if (event.name === 'word' && isPlayingRef.current) {
-                    // Find the actual word index within the current chunk that corresponds to the boundary event
-                    // This is tricky because event.charIndex is relative to textToSpeak, not the original chunk.
-                    // For highlighting, we increment a counter based on actual words spoken.
                     setCurrentWordIndex(wordIndex);
                     wordIndex++;
                 }
@@ -393,19 +443,17 @@ const Converter = () => {
                     currentIndex++;
                     setCurrentChunkIndex(currentIndex);
                     setSavedChunkIndex(currentIndex);
-                    setSavedWordIndex(0); // Reset word index for next chunk
+                    setSavedWordIndex(0);
                     setCurrentWordIndex(0);
-                    setTimeout(() => speakChunk(0), 200); // Small delay between chunks
+                    setTimeout(() => speakChunk(0), 200);
                 }
             };
 
-            utterance.onerror = (event) => {
-                console.error("SpeechSynthesisUtterance error:", event.error);
+            utterance.onerror = () => {
                 setIsPlaying(false);
                 isPlayingRef.current = false;
                 setSavedChunkIndex(currentIndex);
                 setSavedWordIndex(currentWordIndex);
-                setError(`Speech playback error: ${event.error}. Try adjusting settings or reloading.`);
             };
 
             setCurrentUtterance(utterance);
@@ -502,61 +550,30 @@ const Converter = () => {
                     {(isExtracting) && (
                         <div className="mb-6">
                             <div className="flex justify-between text-sm text-gray-600 mb-2">
-                                    <span>
-                                        {isExtracting ? 'Processing book...' :
-                                            `Converting to audio... (${currentChunkIndex}/${textChunks.length} segments)`}
-                                    </span>
+                                <span>
+                                    {isExtracting ? 'Extracting text...' :
+                                        `Converting to audio... (${currentChunkIndex}/${textChunks.length} segments)`}
+                                </span>
                                 <span>{Math.round(progress)}%</span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
-                                <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${progress}%` }}/>
+                                <div
+                                    className="bg-blue-600 h-2 rounded-full transition-all"
+                                    style={{ width: `${progress}%` }}
+                                />
                             </div>
                         </div>
                     )}
 
                     {file && !extractedText && (
                         <div className="mb-6 flex justify-center">
-                            <button onClick={processFile} disabled={isExtracting}
-                                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                            <button
+                                onClick={extractText}
+                                disabled={isExtracting}
+                                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
                             >
-                                {isExtracting ? "Processing Book..." : "Process Book for AudioBook"}
+                                {isExtracting ? "Converting..." : "Convert to AudioBook"}
                             </button>
-                        </div>
-                    )}
-
-                    {extractedText && (
-                        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                                <Square className="w-5 h-5" /> Book Details
-                            </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label htmlFor="bookTitle" className="block text-sm font-medium mb-1">Book Title</label>
-                                    <input type="text" id="bookTitle" placeholder="Enter book title"
-                                        onChange={(e) => setBookTitle(e.target.value)}
-                                        className="w-full p-2 border rounded-md" disabled={isExtracting}
-                                    />
-                                </div>
-                                <div>
-                                    <label htmlFor="bookAuthor" className="block text-sm font-medium mb-1">Author Name</label>
-                                    <input type="text" id="bookAuthor" value={bookAuthor} disabled={isExtracting}
-                                        onChange={(e) => setBookAuthor(e.target.value)}
-                                        className="w-full p-2 border rounded-md" placeholder="Enter author name"
-                                    />
-                                </div>
-                            </div>
-
-                            {bookCoverUrl && (
-                                <div className="mt-4">
-                                    <label className="block text-sm font-medium mb-1">Book Cover</label>
-                                    <img src={bookCoverUrl} alt="Book Cover" className="max-w-[150px] h-auto border rounded-md shadow-sm" />
-                                </div>
-                            )}
-                            {!bookCoverUrl && file && extractedText && ( // Show placeholder if no cover extracted but book processed
-                                <div className="mt-4 text-sm text-gray-500">
-                                    No cover image extracted.
-                                </div>
-                            )}
                         </div>
                     )}
 
@@ -605,14 +622,15 @@ const Converter = () => {
 
                     {extractedText && (
                         <div className="mb-6">
-                            <h3 className="text-lg font-semibold mb-2">Book Content</h3>
+                            <h3 className="text-lg font-semibold mb-2">Book</h3>
                             <div className="bg-gray-100 p-4 rounded-lg max-h-60 overflow-y-auto text-sm">
                                 {highlightedText ? (
-                                    <div dangerouslySetInnerHTML={{ __html: highlightedText }} className="leading-relaxed"/>
+                                    <div
+                                        dangerouslySetInnerHTML={{ __html: highlightedText }}
+                                        className="leading-relaxed"
+                                    />
                                 ) : (
-                                    <div className="leading-relaxed">
-                                        {extractedText}
-                                    </div>
+                                    <div className="leading-relaxed">{extractedText}</div>
                                 )}
                             </div>
                             <p className="text-xs text-gray-500 mt-2">
@@ -636,23 +654,31 @@ const Converter = () => {
                             <h3 className="text-lg font-semibold mb-4">Audio Controls</h3>
 
                             <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
-                                <button onClick={skipBackward} disabled={isExtracting || currentChunkIndex === 0}
+                                <button
+                                    onClick={skipBackward}
+                                    disabled={isExtracting || currentChunkIndex === 0}
                                     className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 disabled:opacity-50 flex items-center gap-2"
                                 >
-                                    <SkipBack className="w-4 h-4" /> Previous
+                                    <SkipBack className="w-4 h-4" />
+                                    Previous
                                 </button>
 
-                                <button onClick={togglePlayback} disabled={isExtracting}
+                                <button
+                                    onClick={togglePlayback}
+                                    disabled={isExtracting}
                                     className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
                                 >
                                     {isPlaying ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                                     {isPlaying ? 'Pause' : 'Play'}
                                 </button>
 
-                                <button onClick={skipForward} disabled={isExtracting || currentChunkIndex >= textChunks.length - 1}
+                                <button
+                                    onClick={skipForward}
+                                    disabled={isExtracting || currentChunkIndex >= textChunks.length - 1}
                                     className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 disabled:opacity-50 flex items-center gap-2"
                                 >
-                                    <SkipForward className="w-4 h-4" /> Next
+                                    <SkipForward className="w-4 h-4" />
+                                    Next
                                 </button>
                             </div>
 
