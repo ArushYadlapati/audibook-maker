@@ -518,7 +518,7 @@ const Converter = () => {
                     <div className="mb-6">
                         <div className="flex justify-center">
                             <h1 className="text-2xl font-bold mb-4 flex items-center gap-2">
-                                Audiobook Converter
+                                AudioBook Converter
                             </h1>
                         </div>
 
@@ -572,7 +572,7 @@ const Converter = () => {
                                 disabled={isExtracting}
                                 className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
                             >
-                                {isExtracting ? "Converting..." : "Convert to Audiobook"}
+                                {isExtracting ? "Converting..." : "Convert to AudioBook"}
                             </button>
                         </div>
                     )}

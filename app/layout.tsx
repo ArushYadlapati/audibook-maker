@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Audio Book Maker",
+  title: "AudioBook Maker",
   description: "Project of Freedom Week",
 };
 

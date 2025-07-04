@@ -6,9 +6,11 @@ const Footer = () => {
     <footer className="bg-black text-white mt-20">
       <div className="max-w-7xl mx-auto py-10 px-4 grid grid-cols-1 md:grid-cols-3 gap-8">
         <div>
-          <h1 className="text-2xl font-bold mb-2">Audiobook Maker</h1>
+          <h1 className="text-2xl font-bold mb-2">AudioBook Maker</h1>
           <p className="text-gray-400 text-sm">
-            Turn text into highly customizable audiobooks.
+            Turn your books into highly customizable audiobooks!
+            <br/>
+            Free forever, no ads, no limits.
           </p>
         </div>
 
@@ -43,8 +45,7 @@ const Footer = () => {
       </div>
 
       <div className="text-center text-gray-500 text-sm border-t border-gray-800 py-4">
-        &copy; {new Date().getFullYear()} Audio Book Maker. All rights reserved.
-        Freedom Week Project
+        &copy; {new Date().getFullYear()} AudioBook Maker. Freedom Week Project
       </div>
     </footer>
   );
