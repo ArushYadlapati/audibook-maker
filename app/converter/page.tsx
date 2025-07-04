@@ -600,38 +600,20 @@ const Converter = () => {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1">Speed: {rate}x</label>
-                                    <input
-                                        type="range"
-                                        min="0.5"
-                                        max="2"
-                                        step="0.1"
-                                        value={rate}
+                                    <input type="range" min="0.5" max="2" step="0.1" value={rate} className="w-full"
                                         onChange={(e) => setRate(parseFloat(e.target.value))}
-                                        className="w-full"
                                     />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1">Pitch: {pitch}</label>
-                                    <input
-                                        type="range"
-                                        min="0.5"
-                                        max="2"
-                                        step="0.1"
-                                        value={pitch}
+                                    <input type="range" min="0.5" max="2" step="0.1" value={pitch} className="w-full"
                                         onChange={(e) => setPitch(parseFloat(e.target.value))}
-                                        className="w-full"
                                     />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1">Volume: {Math.round(volume * 100)}%</label>
-                                    <input
-                                        type="range"
-                                        min="0"
-                                        max="1"
-                                        step="0.1"
-                                        value={volume}
+                                    <input type="range" min="0" max="1" step="0.1" value={volume} className="w-full"
                                         onChange={(e) => setVolume(parseFloat(e.target.value))}
-                                        className="w-full"
                                     />
                                 </div>
                             </div>
@@ -719,6 +701,7 @@ const Converter = () => {
 
                 </div>
             </div>
+
             <Footer/>
         </div>
     );
