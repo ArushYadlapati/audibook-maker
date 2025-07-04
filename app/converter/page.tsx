@@ -516,6 +516,12 @@ const Converter = () => {
             <div className="container mx-auto px-4 py-8 max-w-4xl">
                 <div className="bg-white rounded-lg shadow-lg p-6">
                     <div className="mb-6">
+                        <div className="flex justify-center">
+                            <h1 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                                Audiobook Converter
+                            </h1>
+                        </div>
+
                         <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
                             <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,.epub,.txt" className="hidden"/>
                             <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -560,13 +566,13 @@ const Converter = () => {
                     )}
 
                     {file && !extractedText && (
-                        <div className="mb-6">
+                        <div className="mb-6 flex justify-center">
                             <button
                                 onClick={extractText}
                                 disabled={isExtracting}
                                 className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
                             >
-                                {isExtracting ? "Extracting..." : "Extract Text"}
+                                {isExtracting ? "Converting..." : "Convert to Audibook"}
                             </button>
                         </div>
                     )}

@@ -5,15 +5,13 @@ const Footer = () => {
   return (
     <footer className="bg-black text-white mt-20">
       <div className="max-w-7xl mx-auto py-10 px-4 grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Brand */}
         <div>
-          <h1 className="text-2xl font-bold mb-2">Audio Book Maker</h1>
+          <h1 className="text-2xl font-bold mb-2">Audiobook Maker</h1>
           <p className="text-gray-400 text-sm">
-            Turn text into immersive audio experiences.
+            Turn text into highly customizable audiobooks.
           </p>
         </div>
 
-        {/* Links */}
         <div>
           <h3 className="text-lg font-semibold mb-2">Quick Links</h3>
           <ul className="space-y-1 text-sm text-gray-400">
@@ -29,7 +27,6 @@ const Footer = () => {
           </ul>
         </div>
 
-        {/* Social */}
         <div>
           <h3 className="text-lg font-semibold mb-2">Made By</h3>
           <div className="flex mt-2 flex-col gap-4">
