@@ -1,77 +1,30 @@
 [
   {
     "id": 1,
-    "title": "Photoshoots",
-    "imageUrl": "https://res.cloudinary.com/kizmelvin/image/upload/v1645530542/kizmelvin/Carousel%20assets/luwadlin-bosman-J1oObe7WWjk-unsplash_f56oh3.jpg"
+    "title": "A Court of Thorns and Roses",
+    "imageUrl": "../images/1.jpg",
+    "author": "Sarah J. Maas",
+    "genre": "Fantasy, Romance"
   },
   {
     "id": 2,
-    "title": "Adventure",
-    "imageUrl": "https://res.cloudinary.com/kizmelvin/image/upload/v1645529949/kizmelvin/Carousel%20assets/ali-kazal-q9rpNOd1hcI-unsplash_fhaqzq.jpg"
+    "title": "We Were Liars",
+    "imageUrl": "../images/2.jpeg",
+    "author": "E. Lockhart",
+    "genre": "Mystery, Psychological Thriller"
   },
   {
     "id": 3,
-    "title": "Events",
-    "imageUrl": "https://res.cloudinary.com/kizmelvin/image/upload/v1645530199/kizmelvin/Carousel%20assets/slim-emcee-jzdOX0XkXr8-unsplash_zocsdq.jpg"
+    "title": "Six of Crows",
+    "imageUrl": "../images/3.jpg",
+    "author": "Leigh Bardugo",
+    "genre": "Fantasy, Heist"
   },
   {
     "id": 4,
-    "title": "Discovery",
-    "imageUrl": "https://res.cloudinary.com/kizmelvin/image/upload/v1645530863/kizmelvin/Carousel%20assets/francisco-t-santos-YRcioOWh4mA-unsplash_1_yoowse.jpg"
-  },
-  {
-    "id": 5,
-    "title": "Sports",
-    "imageUrl": "https://res.cloudinary.com/kizmelvin/image/upload/v1645531100/kizmelvin/Carousel%20assets/markus-spiske-WUehAgqO5hE-unsplash_zi9wvh.jpg"
-  },
-  {
-    "id": 6,
-    "title": "Sports",
-    "imageUrl": "https://res.cloudinary.com/kizmelvin/image/upload/v1645531100/kizmelvin/Carousel%20assets/markus-spiske-WUehAgqO5hE-unsplash_zi9wvh.jpg"
-  },
-  {
-    "id": 7,
-    "title": "Sports",
-    "imageUrl": "https://res.cloudinary.com/kizmelvin/image/upload/v1645531100/kizmelvin/Carousel%20assets/markus-spiske-WUehAgqO5hE-unsplash_zi9wvh.jpg"
-  },
-  {
-    "id": 8,
-    "title": "Sports",
-    "imageUrl": "https://res.cloudinary.com/kizmelvin/image/upload/v1645531100/kizmelvin/Carousel%20assets/markus-spiske-WUehAgqO5hE-unsplash_zi9wvh.jpg"
-  },
-  {
-    "id": 9,
-    "title": "Sports",
-    "imageUrl": "https://res.cloudinary.com/kizmelvin/image/upload/v1645531100/kizmelvin/Carousel%20assets/markus-spiske-WUehAgqO5hE-unsplash_zi9wvh.jpg"
-  },
-  {
-    "id": 10,
-    "title": "Sports",
-    "imageUrl": "https://res.cloudinary.com/kizmelvin/image/upload/v1645531100/kizmelvin/Carousel%20assets/markus-spiske-WUehAgqO5hE-unsplash_zi9wvh.jpg"
-  },
-  {
-    "id": 11,
-    "title": "Sports",
-    "imageUrl": "https://res.cloudinary.com/kizmelvin/image/upload/v1645531100/kizmelvin/Carousel%20assets/markus-spiske-WUehAgqO5hE-unsplash_zi9wvh.jpg"
-  },
-  {
-    "id": 12,
-    "title": "Sports",
-    "imageUrl": "https://res.cloudinary.com/kizmelvin/image/upload/v1645531100/kizmelvin/Carousel%20assets/markus-spiske-WUehAgqO5hE-unsplash_zi9wvh.jpg"
-  },
-  {
-    "id": 13,
-    "title": "Sports",
-    "imageUrl": "https://res.cloudinary.com/kizmelvin/image/upload/v1645531100/kizmelvin/Carousel%20assets/markus-spiske-WUehAgqO5hE-unsplash_zi9wvh.jpg"
-  },
-  {
-    "id": 14,
-    "title": "Sports",
-    "imageUrl": "https://res.cloudinary.com/kizmelvin/image/upload/v1645531100/kizmelvin/Carousel%20assets/markus-spiske-WUehAgqO5hE-unsplash_zi9wvh.jpg"
-  },
-  {
-    "id": 15,
-    "title": "Sports",
-    "imageUrl": "https://res.cloudinary.com/kizmelvin/image/upload/v1645531100/kizmelvin/Carousel%20assets/markus-spiske-WUehAgqO5hE-unsplash_zi9wvh.jpg"
+    "title": "One of Us Is Lying",
+    "imageUrl": "../images/4.jpg",
+    "author": "Karen M. McManus",
+    "genre": "Mystery, Thriller"
   }
 ]

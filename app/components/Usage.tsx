@@ -6,19 +6,19 @@ const steps = [
     icon: <FileText className="w-6 h-6 text-white" />,
     title: "1. Upload The Book",
     description:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "Upload your manuscript in PDF, EPUB, or TXT format. Our platform supports multiple file types and ensures a smooth upload process to get your audiobook started.",
   },
   {
     icon: <Settings className="w-6 h-6 text-white" />,
     title: "2. Choose Voices & Languages",
     description:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "Pick from a wide variety of natural-sounding AI voices across different accents and languages. Customize tone, pitch, and speed to match your desired listening experience.",
   },
   {
     icon: <Headphones className="w-6 h-6 text-white" />,
     title: "3. Generate & Listen",
     description:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "Once you're satisfied with your settings, click 'Generate' to create your audiobook. You can listen to a preview and make adjustments as needed before finalizing.",
   },
 ];
 
