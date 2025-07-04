@@ -271,28 +271,27 @@ const Converter = () => {
 
         if (cleaned.length === 0) return '';
 
-        // Find the actual content start - skip copyright and table of contents
+        // Find the table of contents - this is where we want to start
         let startIndex = 0;
 
-        // Look for the actual content start patterns
-        const contentPatterns = [
-            /PROLOGUE\s+[A-Z]/i,  // PROLOGUE followed by capital letter (actual content)
-            /CHAPTER\s+1\s+[A-Z]/i,  // CHAPTER 1 followed by capital letter
-            /CHAPTER\s+ONE\s+[A-Z]/i,  // CHAPTER ONE followed by capital letter
-            /PART\s+1\s+[A-Z]/i,  // PART 1 followed by capital letter
-            /PART\s+ONE\s+[A-Z]/i   // PART ONE followed by capital letter
+        // Look for table of contents patterns
+        const tocPatterns = [
+            /CONTENTS\s/i,
+            /TABLE\s+OF\s+CONTENTS/i,
+            /CONTENTS\s+Prologue/i,
+            /CONTENTS\s+Chapter/i
         ];
 
-        for (const pattern of contentPatterns) {
+        for (const pattern of tocPatterns) {
             const match = cleaned.match(pattern);
             if (match && match.index !== undefined) {
                 startIndex = match.index;
-                console.log(`Starting content at: "${cleaned.slice(startIndex, startIndex + 50)}..."`);
+                console.log(`Starting from table of contents at: "${cleaned.slice(startIndex, startIndex + 50)}..."`);
                 break;
             }
         }
 
-        // Return the cleaned text starting from actual content
+        // Return the cleaned text starting from table of contents
         return cleaned.slice(startIndex);
     };
 
