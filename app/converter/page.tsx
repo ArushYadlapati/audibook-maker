@@ -26,7 +26,7 @@ const Converter = () => {
     const [isPlaying, setIsPlaying] = useState<boolean>(false);
     const isPlayingRef = useRef(false);
     const [currentChunkIndex, setCurrentChunkIndex] = useState<number>(0);
-    const [savedChunkIndex, setSavedChunkIndex] = useState<number>(0); // Track saved position
+    const [savedChunkIndex, setSavedChunkIndex] = useState<number>(0);
     const [pdfLib, setPdfLib] = useState<PDFLib | null>(null);
     const [, setLamejsLib] = useState<LameJS | null>(null);
 
@@ -248,7 +248,6 @@ const Converter = () => {
             setExtractedText(text);
             setSuccess(`Text extracted successfully! (${text.length} characters)`);
 
-            // Improved chunking for better speech synthesis
             const chunks = splitTextIntoChunks(text);
             setTextChunks(chunks);
             setCurrentChunkIndex(0);
@@ -266,75 +265,64 @@ const Converter = () => {
     };
 
     const cleanText = (text: string): string => {
-        // Normalize whitespace first
+
         let cleaned = text.replace(/\s+/g, ' ').trim();
 
         if (cleaned.length === 0) return '';
 
-        // Find the table of contents - this is where we want to start
         let startIndex = 0;
 
-        // Look for table of contents patterns
-        const tocPatterns = [
-            /CONTENTS\s/i,
-            /TABLE\s+OF\s+CONTENTS/i,
-            /CONTENTS\s+Prologue/i,
-            /CONTENTS\s+Chapter/i
+        const contentPatterns = [
+            /PROLOGUE\s+[A-Z]/i,
+            /CHAPTER\s+1\s+[A-Z]/i,
+            /CHAPTER\s+ONE\s+[A-Z]/i,
+            /PART\s+1\s+[A-Z]/i,
+            /PART\s+ONE\s+[A-Z]/i
         ];
 
-        for (const pattern of tocPatterns) {
+        for (const pattern of contentPatterns) {
             const match = cleaned.match(pattern);
             if (match && match.index !== undefined) {
                 startIndex = match.index;
-                console.log(`Starting from table of contents at: "${cleaned.slice(startIndex, startIndex + 50)}..."`);
+                console.log(`Starting content at: "${cleaned.slice(startIndex, startIndex + 50)}..."`);
                 break;
             }
         }
 
-        // Return the cleaned text starting from table of contents
         return cleaned.slice(startIndex);
     };
 
-    const splitTextIntoChunks = (inText: string): string[] => {
-        const text = cleanText(inText);
-        // Fast cleanup: normalize whitespace and remove non-sentence-safe characters
+    const splitTextIntoChunks = (text: string): string[] => {
+
         const cleaned: string = text
             .replace(/[^\w\s.,!?;:()\-'"]/g, '') // remove unsafe characters
-            .replace(/\s+/g, ' ') // collapse whitespace
+            .replace(/\s+/g, ' ')
             .trim();
 
         if (cleaned.length === 0) return [];
 
-        // Find and skip table of contents
         const tocPatterns = [
             /table\s+of\s+contents/i,
             /contents/i,
             /chapter\s+\d+.*?\.\.\./i,
             /part\s+\d+.*?\.\.\./i,
             /section\s+\d+.*?\.\.\./i,
-            /^\s*\d+\.\s+.*?\.\.\./im, // numbered items with dots
+            /^\s*\d+\.\s+.*?\.\.\./im,
             /^\s*chapter\s+\d+/im,
-            /^\s*part\s+[ivx]+/im // Roman numerals
+            /^\s*part\s+[ivx]+/im
         ];
 
         let startIndex = 0;
         let tocEndIndex = -1;
 
-        // Look for table of contents patterns
         for (const pattern of tocPatterns) {
             const match = cleaned.match(pattern);
             if (match) {
                 const tocStart = match.index || 0;
 
-                // Find the end of TOC by looking for:
-                // 1. First actual chapter/section start
-                // 2. Multiple consecutive lines without dots
-                // 3. A paragraph that's longer than typical TOC entries
-
                 let searchStart = tocStart + match[0].length;
                 let foundEnd = false;
 
-                // Method 1: Look for chapter/section beginning
                 const chapterPatterns = [
                     /(?:^|\n\s*)(chapter\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+)(?:\s|$))/i,
                     /(?:^|\n\s*)(part\s+(?:one|two|three|four|five|i|ii|iii|iv|v|vi|vii|viii|ix|x|\d+)(?:\s|$))/i,
@@ -352,7 +340,6 @@ const Converter = () => {
                     }
                 }
 
-                // Method 2: Look for end of dotted lines pattern
                 if (!foundEnd) {
                     const lines = cleaned.slice(searchStart).split('\n');
                     let consecutiveNonDottedLines = 0;
@@ -360,13 +347,12 @@ const Converter = () => {
 
                     for (const line of lines) {
                         const trimmedLine = line.trim();
-                        currentPos += line.length + 1; // +1 for newline
+                        currentPos += line.length + 1;
 
                         if (trimmedLine.length === 0) {
                             continue;
                         }
 
-                        // Check if line looks like TOC entry (has dots, page numbers, etc.)
                         const isTocLine = /\.{2,}|\d+\s*$|^\s*\d+\.\s+/.test(trimmedLine);
 
                         if (!isTocLine && trimmedLine.length > 50) {
@@ -382,7 +368,6 @@ const Converter = () => {
                     }
                 }
 
-                // If we found TOC but not the end, skip a reasonable amount
                 if (!foundEnd) {
                     const tocText = cleaned.slice(tocStart);
                     const firstParagraphEnd = tocText.indexOf('\n\n');
@@ -397,28 +382,24 @@ const Converter = () => {
             }
         }
 
-        // Set start index after TOC
         if (tocEndIndex > 0) {
             startIndex = tocEndIndex;
             console.log(`Skipping table of contents, starting at character ${startIndex}`);
         }
 
-        // Get the text after TOC
         const textToProcess = cleaned.slice(startIndex);
 
         const chunks: string[] = [];
         let current = '';
-        const maxChunkSize = 200; // Optimal size for speech synthesis
+        const maxChunkSize = 200;
 
         for (let i = 0; i < textToProcess.length; i++) {
             const c = textToProcess[i];
             current += c;
 
-            // Check for sentence boundaries
             const isSentenceEnd = (c === '.' || c === '!' || c === '?') &&
                 (i === textToProcess.length - 1 || textToProcess[i + 1] === ' ');
 
-            // Create chunk if we hit sentence boundary and have reasonable length
             if (isSentenceEnd && current.trim().length > 20) {
                 const trimmed = current.trim();
                 if (trimmed.length > 0) {
@@ -426,7 +407,7 @@ const Converter = () => {
                     current = '';
                 }
             }
-            // Force chunk if it gets too long (break at word boundary)
+
             else if (current.length > maxChunkSize) {
                 const lastSpace = current.lastIndexOf(' ');
                 if (lastSpace > 0) {
@@ -439,7 +420,6 @@ const Converter = () => {
             }
         }
 
-        // Add any remaining text
         const finalTrimmed = current.trim();
         if (finalTrimmed.length > 0) {
             chunks.push(finalTrimmed);
@@ -449,14 +429,12 @@ const Converter = () => {
         return chunks;
     };
 
-
     const playLive = () => {
         speechSynthesis.cancel();
         setIsPlaying(true);
         isPlayingRef.current = true;
         playTextLive(savedChunkIndex).then();
     };
-
 
     const playTextLive = async (startIndex: number = 0) => {
         if (!textChunks.length) return;
