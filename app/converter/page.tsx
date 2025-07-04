@@ -27,9 +27,10 @@ const Converter = () => {
     const isPlayingRef = useRef(false);
     const [currentChunkIndex, setCurrentChunkIndex] = useState<number>(0);
     const [savedChunkIndex, setSavedChunkIndex] = useState<number>(0);
+    const [savedWordIndex, setSavedWordIndex] = useState<number>(0);
     const [pdfLib, setPdfLib] = useState<PDFLib | null>(null);
     const [, setLamejsLib] = useState<LameJS | null>(null);
-    const [, setCurrentWordIndex] = useState<number>(0);
+    const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
     const [highlightedText, setHighlightedText] = useState<string>("");
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -113,11 +114,13 @@ const Converter = () => {
         setTimeout(loadVoices, 100);
     }, [voice]);
 
+
     useEffect(() => {
-        if (textChunks.length > 0 && currentChunkIndex < textChunks.length) {
-            updateHighlightedText(currentChunkIndex, 0);
+        if (textChunks.length > 0) {
+            const highlighted = getFullHighlightedText();
+            setHighlightedText(highlighted);
         }
-    }, [currentChunkIndex, textChunks]);
+    }, [currentChunkIndex, textChunks, isPlaying, currentWordIndex]);
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const uploadedFile = event.target.files?.[0];
@@ -143,6 +146,7 @@ const Converter = () => {
         setProgress(0);
         setCurrentChunkIndex(0);
         setSavedChunkIndex(0);
+        setSavedWordIndex(0);
         setCurrentWordIndex(0);
         setHighlightedText('');
     };
@@ -176,17 +180,15 @@ const Converter = () => {
 
     const extractTextFromEPUB = async (file: File): Promise<string> => {
         try {
-            const JSZip = await new Promise<any>((resolve, reject) => {
+            const JSZip = await new Promise<any>((resolve) => {
                 const script = document.createElement('script');
                 script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
                 script.onload = () => {
                     if (window.JSZip) {
                         resolve(window.JSZip);
-                    } else {
-                        reject(new Error('JSZip not loaded'));
                     }
                 };
-                script.onerror = () => reject(new Error('Failed to load JSZip'));
+
                 document.head.appendChild(script);
             });
 
@@ -262,6 +264,7 @@ const Converter = () => {
             setTextChunks(chunks);
             setCurrentChunkIndex(0);
             setSavedChunkIndex(0);
+            setSavedWordIndex(0);
             setCurrentWordIndex(0);
 
             console.log(`Created ${chunks.length} chunks from ${text.length} characters`);
@@ -327,36 +330,48 @@ const Converter = () => {
         return chunks;
     };
 
-    const updateHighlightedText = (chunkIndex: number, wordIndex: number) => {
-        if (chunkIndex >= textChunks.length) return;
+    const getFullHighlightedText = () => {
+        if (!textChunks.length) return extractedText;
 
-        const chunk = textChunks[chunkIndex];
-        const words = chunk.split(/(\s+)/);
-        const actualWords = words.filter(word => word.trim().length > 0);
+        let fullHighlightedText = '';
 
-        if (wordIndex >= actualWords.length) {
-            setHighlightedText(chunk);
-            return;
-        }
+        for (let i = 0; i < textChunks.length; i++) {
+            const chunk = textChunks[i];
 
-        let highlightedHtml = '';
-        let actualWordIndex = 0;
+            if (i === currentChunkIndex && isPlaying) {
+                const words = chunk.split(/(\s+)/);
+                // const actualWords = words.filter(word => word.trim().length > 0);
 
-        for (let i = 0; i < words.length; i++) {
-            const word = words[i];
-            if (word.trim().length > 0) {
-                if (actualWordIndex === wordIndex) {
-                    highlightedHtml += `<span class="bg-yellow-300 font-bold">${word}</span>`;
-                } else {
-                    highlightedHtml += word;
+                let highlightedChunk = '';
+                let actualWordIndex = 0;
+
+                for (let j = 0; j < words.length; j++) {
+                    const word = words[j];
+                    if (word.trim().length > 0) {
+                        if (actualWordIndex === currentWordIndex) {
+                            highlightedChunk += `<span class="bg-yellow-300 font-bold">${word}</span>`;
+                        } else {
+                            highlightedChunk += word;
+                        }
+                        actualWordIndex++;
+                    } else {
+                        highlightedChunk += word;
+                    }
                 }
-                actualWordIndex++;
+
+                fullHighlightedText += highlightedChunk;
+            } else if (i === currentChunkIndex && !isPlaying) {
+                fullHighlightedText += `<span class="bg-blue-100 font-medium">${chunk}</span>`;
             } else {
-                highlightedHtml += word;
+                fullHighlightedText += chunk;
+            }
+
+            if (i < textChunks.length - 1) {
+                fullHighlightedText += ' ';
             }
         }
 
-        setHighlightedText(highlightedHtml);
+        return fullHighlightedText;
     };
 
     const togglePlayback = () => {
@@ -371,55 +386,66 @@ const Converter = () => {
         speechSynthesis.cancel();
         setIsPlaying(true);
         isPlayingRef.current = true;
-        playTextLive(savedChunkIndex).then();
+        playTextLive(savedChunkIndex, savedWordIndex).then();
     };
 
-    const playTextLive = async (startIndex: number = 0) => {
+    const playTextLive = async (startChunkIndex: number = 0, startWordIndex: number = 0) => {
         if (!textChunks.length) return;
 
-        let currentIndex = startIndex;
+        let currentIndex = startChunkIndex;
         setCurrentChunkIndex(currentIndex);
 
-        const speakChunk = () => {
+        const speakChunk = (skipToWord: number = 0) => {
             if (currentIndex >= textChunks.length) {
                 setIsPlaying(false);
                 isPlayingRef.current = false;
                 setSavedChunkIndex(0);
+                setSavedWordIndex(0);
                 setCurrentWordIndex(0);
                 return;
             }
 
             if (!isPlayingRef.current) {
                 setSavedChunkIndex(currentIndex);
+                setSavedWordIndex(currentWordIndex);
                 return;
             }
 
             const chunk = textChunks[currentIndex];
             const words = chunk.split(/(\s+)/).filter(word => word.trim().length > 0);
-            const utterance = new SpeechSynthesisUtterance(chunk);
+
+            let textToSpeak = chunk;
+            let wordOffset = 0;
+
+            if (skipToWord > 0) {
+                const wordsToSpeak = words.slice(skipToWord);
+                textToSpeak = wordsToSpeak.join(' ');
+                wordOffset = skipToWord;
+            }
+
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
 
             if (voice) utterance.voice = voice;
             utterance.rate = rate;
             utterance.pitch = pitch;
             utterance.volume = volume;
 
-            let wordIndex = 0;
+            let wordIndex = wordOffset;
             utterance.onboundary = (event) => {
-                if (event.name === 'word') {
+                if (event.name === 'word' && isPlayingRef.current) {
                     setCurrentWordIndex(wordIndex);
-                    updateHighlightedText(currentIndex, wordIndex);
                     wordIndex++;
                 }
             };
 
             utterance.onend = () => {
-                currentIndex++;
-                setCurrentChunkIndex(currentIndex);
-                setSavedChunkIndex(currentIndex);
-                setCurrentWordIndex(0);
-
                 if (isPlayingRef.current) {
-                    setTimeout(speakChunk, 200);
+                    currentIndex++;
+                    setCurrentChunkIndex(currentIndex);
+                    setSavedChunkIndex(currentIndex);
+                    setSavedWordIndex(0);
+                    setCurrentWordIndex(0);
+                    setTimeout(() => speakChunk(0), 200);
                 }
             };
 
@@ -427,13 +453,14 @@ const Converter = () => {
                 setIsPlaying(false);
                 isPlayingRef.current = false;
                 setSavedChunkIndex(currentIndex);
+                setSavedWordIndex(currentWordIndex);
             };
 
             setCurrentUtterance(utterance);
             speechSynthesis.speak(utterance);
         };
 
-        speakChunk();
+        speakChunk(startWordIndex);
     };
 
     const stopPlayback = () => {
@@ -441,26 +468,21 @@ const Converter = () => {
         setIsPlaying(false);
         isPlayingRef.current = false;
         setSavedChunkIndex(currentChunkIndex);
-        setCurrentWordIndex(0);
-
-        if (currentChunkIndex < textChunks.length) {
-            updateHighlightedText(currentChunkIndex, 0);
-        }
+        setSavedWordIndex(currentWordIndex);
     };
 
     const skipBackward = () => {
         const newIndex = Math.max(0, currentChunkIndex - 1);
         setCurrentChunkIndex(newIndex);
         setSavedChunkIndex(newIndex);
+        setSavedWordIndex(0);
         setCurrentWordIndex(0);
 
         if (isPlaying) {
             speechSynthesis.cancel();
             setTimeout(() => {
-                playTextLive(newIndex).then();
+                playTextLive(newIndex, 0).then();
             }, 100);
-        } else {
-            updateHighlightedText(newIndex, 0);
         }
     };
 
@@ -468,15 +490,14 @@ const Converter = () => {
         const newIndex = Math.min(textChunks.length - 1, currentChunkIndex + 1);
         setCurrentChunkIndex(newIndex);
         setSavedChunkIndex(newIndex);
+        setSavedWordIndex(0);
         setCurrentWordIndex(0);
 
         if (isPlaying) {
             speechSynthesis.cancel();
             setTimeout(() => {
-                playTextLive(newIndex).then();
+                playTextLive(newIndex, 0).then();
             }, 100);
-        } else {
-            updateHighlightedText(newIndex, 0);
         }
     };
 
@@ -629,6 +650,11 @@ const Converter = () => {
                                 {textChunks.length > 0 && (
                                     <span className="ml-2">
                                         Current: {currentChunkIndex + 1}/{textChunks.length}
+                                        {isPlaying && (
+                                            <span className="ml-2">
+                                                | Word: {currentWordIndex + 1}
+                                            </span>
+                                        )}
                                     </span>
                                 )}
                             </p>
@@ -655,7 +681,7 @@ const Converter = () => {
                                     className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
                                 >
                                     {isPlaying ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                                    {isPlaying ? 'Stop' : 'Play'}
+                                    {isPlaying ? 'Pause' : 'Play'}
                                 </button>
 
                                 <button
