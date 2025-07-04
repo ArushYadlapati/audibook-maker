@@ -243,7 +243,7 @@ const Converter = () => {
                 text = await extractTextFromTXT(file);
             }
 
-            text = text.replace(/\s+/g, ' ').trim();
+            text = cleanText(text);
 
             setExtractedText(text);
             setSuccess(`Text extracted successfully! (${text.length} characters)`);
@@ -265,7 +265,39 @@ const Converter = () => {
         }
     };
 
-    const splitTextIntoChunks = (text: string): string[] => {
+    const cleanText = (text: string): string => {
+        // Normalize whitespace first
+        let cleaned = text.replace(/\s+/g, ' ').trim();
+
+        if (cleaned.length === 0) return '';
+
+        // Find the actual content start - skip copyright and table of contents
+        let startIndex = 0;
+
+        // Look for the actual content start patterns
+        const contentPatterns = [
+            /PROLOGUE\s+[A-Z]/i,  // PROLOGUE followed by capital letter (actual content)
+            /CHAPTER\s+1\s+[A-Z]/i,  // CHAPTER 1 followed by capital letter
+            /CHAPTER\s+ONE\s+[A-Z]/i,  // CHAPTER ONE followed by capital letter
+            /PART\s+1\s+[A-Z]/i,  // PART 1 followed by capital letter
+            /PART\s+ONE\s+[A-Z]/i   // PART ONE followed by capital letter
+        ];
+
+        for (const pattern of contentPatterns) {
+            const match = cleaned.match(pattern);
+            if (match && match.index !== undefined) {
+                startIndex = match.index;
+                console.log(`Starting content at: "${cleaned.slice(startIndex, startIndex + 50)}..."`);
+                break;
+            }
+        }
+
+        // Return the cleaned text starting from actual content
+        return cleaned.slice(startIndex);
+    };
+
+    const splitTextIntoChunks = (inText: string): string[] => {
+        const text = cleanText(inText);
         // Fast cleanup: normalize whitespace and remove non-sentence-safe characters
         const cleaned: string = text
             .replace(/[^\w\s.,!?;:()\-'"]/g, '') // remove unsafe characters
@@ -274,29 +306,147 @@ const Converter = () => {
 
         if (cleaned.length === 0) return [];
 
+        // Find and skip table of contents
+        const tocPatterns = [
+            /table\s+of\s+contents/i,
+            /contents/i,
+            /chapter\s+\d+.*?\.\.\./i,
+            /part\s+\d+.*?\.\.\./i,
+            /section\s+\d+.*?\.\.\./i,
+            /^\s*\d+\.\s+.*?\.\.\./im, // numbered items with dots
+            /^\s*chapter\s+\d+/im,
+            /^\s*part\s+[ivx]+/im // Roman numerals
+        ];
+
+        let startIndex = 0;
+        let tocEndIndex = -1;
+
+        // Look for table of contents patterns
+        for (const pattern of tocPatterns) {
+            const match = cleaned.match(pattern);
+            if (match) {
+                const tocStart = match.index || 0;
+
+                // Find the end of TOC by looking for:
+                // 1. First actual chapter/section start
+                // 2. Multiple consecutive lines without dots
+                // 3. A paragraph that's longer than typical TOC entries
+
+                let searchStart = tocStart + match[0].length;
+                let foundEnd = false;
+
+                // Method 1: Look for chapter/section beginning
+                const chapterPatterns = [
+                    /(?:^|\n\s*)(chapter\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+)(?:\s|$))/i,
+                    /(?:^|\n\s*)(part\s+(?:one|two|three|four|five|i|ii|iii|iv|v|vi|vii|viii|ix|x|\d+)(?:\s|$))/i,
+                    /(?:^|\n\s*)(section\s+(?:one|two|three|four|five|\d+)(?:\s|$))/i,
+                    /(?:^|\n\s*)(\d+\.\s+[A-Z])/,
+                    /(?:^|\n\s*)(introduction|foreword|preface|prologue)(?:\s|$)/i
+                ];
+
+                for (const chapterPattern of chapterPatterns) {
+                    const chapterMatch = cleaned.slice(searchStart).match(chapterPattern);
+                    if (chapterMatch && chapterMatch.index !== undefined) {
+                        tocEndIndex = searchStart + chapterMatch.index;
+                        foundEnd = true;
+                        break;
+                    }
+                }
+
+                // Method 2: Look for end of dotted lines pattern
+                if (!foundEnd) {
+                    const lines = cleaned.slice(searchStart).split('\n');
+                    let consecutiveNonDottedLines = 0;
+                    let currentPos = searchStart;
+
+                    for (const line of lines) {
+                        const trimmedLine = line.trim();
+                        currentPos += line.length + 1; // +1 for newline
+
+                        if (trimmedLine.length === 0) {
+                            continue;
+                        }
+
+                        // Check if line looks like TOC entry (has dots, page numbers, etc.)
+                        const isTocLine = /\.{2,}|\d+\s*$|^\s*\d+\.\s+/.test(trimmedLine);
+
+                        if (!isTocLine && trimmedLine.length > 50) {
+                            consecutiveNonDottedLines++;
+                            if (consecutiveNonDottedLines >= 2) {
+                                tocEndIndex = currentPos - line.length - 1;
+                                foundEnd = true;
+                                break;
+                            }
+                        } else {
+                            consecutiveNonDottedLines = 0;
+                        }
+                    }
+                }
+
+                // If we found TOC but not the end, skip a reasonable amount
+                if (!foundEnd) {
+                    const tocText = cleaned.slice(tocStart);
+                    const firstParagraphEnd = tocText.indexOf('\n\n');
+                    if (firstParagraphEnd > 0) {
+                        tocEndIndex = tocStart + firstParagraphEnd;
+                    } else {
+                        tocEndIndex = Math.min(tocStart + 2000, cleaned.length);
+                    }
+                }
+
+                break;
+            }
+        }
+
+        // Set start index after TOC
+        if (tocEndIndex > 0) {
+            startIndex = tocEndIndex;
+            console.log(`Skipping table of contents, starting at character ${startIndex}`);
+        }
+
+        // Get the text after TOC
+        const textToProcess = cleaned.slice(startIndex);
+
         const chunks: string[] = [];
         let current = '';
+        const maxChunkSize = 200; // Optimal size for speech synthesis
 
-        for (let i = 0; i < cleaned.length; i++) {
-            const c = cleaned[i];
+        for (let i = 0; i < textToProcess.length; i++) {
+            const c = textToProcess[i];
             current += c;
 
-            // Sentence boundary check
-            if ((c === '.' || c === '!' || c === '?') && (i === cleaned.length - 1 || cleaned[i + 1] === ' ')) {
+            // Check for sentence boundaries
+            const isSentenceEnd = (c === '.' || c === '!' || c === '?') &&
+                (i === textToProcess.length - 1 || textToProcess[i + 1] === ' ');
+
+            // Create chunk if we hit sentence boundary and have reasonable length
+            if (isSentenceEnd && current.trim().length > 20) {
                 const trimmed = current.trim();
                 if (trimmed.length > 0) {
                     chunks.push(trimmed);
                     current = '';
                 }
             }
+            // Force chunk if it gets too long (break at word boundary)
+            else if (current.length > maxChunkSize) {
+                const lastSpace = current.lastIndexOf(' ');
+                if (lastSpace > 0) {
+                    const chunk = current.slice(0, lastSpace).trim();
+                    if (chunk.length > 0) {
+                        chunks.push(chunk);
+                        current = current.slice(lastSpace + 1);
+                    }
+                }
+            }
         }
 
-        // Add remaining text if no terminal punctuation
+        // Add any remaining text
         const finalTrimmed = current.trim();
         if (finalTrimmed.length > 0) {
             chunks.push(finalTrimmed);
         }
 
+        console.log(`Created ${chunks.length} chunks, skipped ${startIndex} characters`);
         return chunks;
     };
 
