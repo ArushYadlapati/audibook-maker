@@ -293,129 +293,18 @@ const Converter = () => {
     };
 
     const splitTextIntoChunks = (text: string): string[] => {
-
-        const cleaned: string = text
-            .replace(/[^\w\s.,!?;:()\-'"]/g, '') // remove unsafe characters
-            .replace(/\s+/g, ' ')
-            .trim();
-
-        if (cleaned.length === 0) return [];
-
-        const tocPatterns = [
-            /table\s+of\s+contents/i,
-            /contents/i,
-            /chapter\s+\d+.*?\.\.\./i,
-            /part\s+\d+.*?\.\.\./i,
-            /section\s+\d+.*?\.\.\./i,
-            /^\s*\d+\.\s+.*?\.\.\./im,
-            /^\s*chapter\s+\d+/im,
-            /^\s*part\s+[ivx]+/im
-        ];
-
-        let startIndex = 0;
-        let tocEndIndex = -1;
-
-        for (const pattern of tocPatterns) {
-            const match = cleaned.match(pattern);
-            if (match) {
-                const tocStart = match.index || 0;
-
-                let searchStart = tocStart + match[0].length;
-                let foundEnd = false;
-
-                const chapterPatterns = [
-                    /(?:^|\n\s*)(chapter\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+)(?:\s|$))/i,
-                    /(?:^|\n\s*)(part\s+(?:one|two|three|four|five|i|ii|iii|iv|v|vi|vii|viii|ix|x|\d+)(?:\s|$))/i,
-                    /(?:^|\n\s*)(section\s+(?:one|two|three|four|five|\d+)(?:\s|$))/i,
-                    /(?:^|\n\s*)(\d+\.\s+[A-Z])/,
-                    /(?:^|\n\s*)(introduction|foreword|preface|prologue)(?:\s|$)/i
-                ];
-
-                for (const chapterPattern of chapterPatterns) {
-                    const chapterMatch = cleaned.slice(searchStart).match(chapterPattern);
-                    if (chapterMatch && chapterMatch.index !== undefined) {
-                        tocEndIndex = searchStart + chapterMatch.index;
-                        foundEnd = true;
-                        break;
-                    }
-                }
-
-                if (!foundEnd) {
-                    const lines = cleaned.slice(searchStart).split('\n');
-                    let consecutiveNonDottedLines = 0;
-                    let currentPos = searchStart;
-
-                    for (const line of lines) {
-                        const trimmedLine = line.trim();
-                        currentPos += line.length + 1;
-
-                        if (trimmedLine.length === 0) {
-                            continue;
-                        }
-
-                        const isTocLine = /\.{2,}|\d+\s*$|^\s*\d+\.\s+/.test(trimmedLine);
-
-                        if (!isTocLine && trimmedLine.length > 50) {
-                            consecutiveNonDottedLines++;
-                            if (consecutiveNonDottedLines >= 2) {
-                                tocEndIndex = currentPos - line.length - 1;
-                                foundEnd = true;
-                                break;
-                            }
-                        } else {
-                            consecutiveNonDottedLines = 0;
-                        }
-                    }
-                }
-
-                if (!foundEnd) {
-                    const tocText = cleaned.slice(tocStart);
-                    const firstParagraphEnd = tocText.indexOf('\n\n');
-                    if (firstParagraphEnd > 0) {
-                        tocEndIndex = tocStart + firstParagraphEnd;
-                    } else {
-                        tocEndIndex = Math.min(tocStart + 2000, cleaned.length);
-                    }
-                }
-
-                break;
-            }
-        }
-
-        if (tocEndIndex > 0) {
-            startIndex = tocEndIndex;
-            console.log(`Skipping table of contents, starting at character ${startIndex}`);
-        }
-
-        const textToProcess = cleaned.slice(startIndex);
-
         const chunks: string[] = [];
-        let current = '';
-        const maxChunkSize = 200;
+        let current = "";
 
-        for (let i = 0; i < textToProcess.length; i++) {
-            const c = textToProcess[i];
+        for (let i = 0; i < text.length; i++) {
+            const c = text[i];
             current += c;
 
-            const isSentenceEnd = (c === '.' || c === '!' || c === '?') &&
-                (i === textToProcess.length - 1 || textToProcess[i + 1] === ' ');
-
-            if (isSentenceEnd && current.trim().length > 20) {
+            if ((c === '.' || c === '!' || c === '?') && (i === text.length - 1 || text[i + 1] === ' ')) {
                 const trimmed = current.trim();
                 if (trimmed.length > 0) {
                     chunks.push(trimmed);
                     current = '';
-                }
-            }
-
-            else if (current.length > maxChunkSize) {
-                const lastSpace = current.lastIndexOf(' ');
-                if (lastSpace > 0) {
-                    const chunk = current.slice(0, lastSpace).trim();
-                    if (chunk.length > 0) {
-                        chunks.push(chunk);
-                        current = current.slice(lastSpace + 1);
-                    }
                 }
             }
         }
@@ -425,7 +314,6 @@ const Converter = () => {
             chunks.push(finalTrimmed);
         }
 
-        console.log(`Created ${chunks.length} chunks, skipped ${startIndex} characters`);
         return chunks;
     };
 
@@ -467,7 +355,7 @@ const Converter = () => {
                 setSavedChunkIndex(currentIndex);
 
                 if (isPlayingRef) {
-                    setTimeout(speakChunk, 10);
+                    setTimeout(speakChunk, 200);
                 }
             };
 
