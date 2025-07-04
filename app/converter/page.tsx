@@ -15,7 +15,7 @@ const Converter = () => {
     const [, setAudioUrl] = useState<string>('');
     const [, setCurrentUtterance] = useState<SpeechSynthesisUtterance | null>(null);
     const [progress, setProgress] = useState<number>(0);
-    const [volume, setVolume] = useState<number>(0.8);
+    const [volume, setVolume] = useState<number>(1.0);
     const [rate, setRate] = useState<number>(1);
     const [pitch, setPitch] = useState<number>(1);
     const [voice, setVoice] = useState<SpeechSynthesisVoice | null>(null);
@@ -572,7 +572,7 @@ const Converter = () => {
                                 disabled={isExtracting}
                                 className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
                             >
-                                {isExtracting ? "Converting..." : "Convert to Audibook"}
+                                {isExtracting ? "Converting..." : "Convert to Audiobook"}
                             </button>
                         </div>
                     )}
