@@ -3,7 +3,7 @@
 import React, {useEffect, useRef, useState} from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { AlertCircle, CheckCircle, Play, Settings, Square, Upload } from "lucide-react";
+import { AlertCircle, CheckCircle, Play, Settings, Square, Upload, SkipBack, SkipForward } from "lucide-react";
 
 import { PDFLib, LameJS } from "./convertHandler";
 
@@ -13,7 +13,7 @@ const Converter = () => {
     const [isExtracting, setIsExtracting] = useState<boolean>(false);
     const [, setAudioBlob] = useState<Blob | null>(null);
     const [audioUrl, setAudioUrl] = useState<string>('');
-    const [, setCurrentUtterance] = useState<SpeechSynthesisUtterance | null>(null);
+    const [currentUtterance, setCurrentUtterance] = useState<SpeechSynthesisUtterance | null>(null);
     const [progress, setProgress] = useState<number>(0);
     const [volume, setVolume] = useState<number>(0.8);
     const [rate, setRate] = useState<number>(1);
@@ -29,6 +29,7 @@ const Converter = () => {
     const [savedChunkIndex, setSavedChunkIndex] = useState<number>(0);
     const [pdfLib, setPdfLib] = useState<PDFLib | null>(null);
     const [, setLamejsLib] = useState<LameJS | null>(null);
+    const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -135,6 +136,7 @@ const Converter = () => {
         setProgress(0);
         setCurrentChunkIndex(0);
         setSavedChunkIndex(0);
+        setCurrentWordIndex(0);
     };
 
     const extractTextFromPDF = async (file: File): Promise<string> => {
@@ -252,6 +254,7 @@ const Converter = () => {
             setTextChunks(chunks);
             setCurrentChunkIndex(0);
             setSavedChunkIndex(0);
+            setCurrentWordIndex(0);
 
             console.log(`Created ${chunks.length} chunks from ${text.length} characters`);
 
@@ -265,7 +268,6 @@ const Converter = () => {
     };
 
     const cleanText = (text: string): string => {
-
         let cleaned = text.replace(/\s+/g, ' ').trim();
 
         if (cleaned.length === 0) return '';
@@ -317,6 +319,15 @@ const Converter = () => {
         return chunks;
     };
 
+
+    const togglePlayback = () => {
+        if (isPlaying) {
+            stopPlayback();
+        } else {
+            playLive();
+        }
+    };
+
     const playLive = () => {
         speechSynthesis.cancel();
         setIsPlaying(true);
@@ -333,16 +344,20 @@ const Converter = () => {
         const speakChunk = () => {
             if (currentIndex >= textChunks.length) {
                 setIsPlaying(false);
+                isPlayingRef.current = false;
                 setSavedChunkIndex(0);
+                setCurrentWordIndex(0);
                 return;
             }
 
-            if (!isPlayingRef) {
+            if (!isPlayingRef.current) {
                 setSavedChunkIndex(currentIndex);
                 return;
             }
 
-            const utterance = new SpeechSynthesisUtterance(textChunks[currentIndex]);
+            const chunk = textChunks[currentIndex];
+            const words = chunk.split(/(\s+)/).filter(word => word.trim().length > 0);
+            const utterance = new SpeechSynthesisUtterance(chunk);
 
             if (voice) utterance.voice = voice;
             utterance.rate = rate;
@@ -353,14 +368,16 @@ const Converter = () => {
                 currentIndex++;
                 setCurrentChunkIndex(currentIndex);
                 setSavedChunkIndex(currentIndex);
+                setCurrentWordIndex(0);
 
-                if (isPlayingRef) {
+                if (isPlayingRef.current) {
                     setTimeout(speakChunk, 200);
                 }
             };
 
             utterance.onerror = () => {
                 setIsPlaying(false);
+                isPlayingRef.current = false;
                 setSavedChunkIndex(currentIndex);
             };
 
@@ -376,6 +393,35 @@ const Converter = () => {
         setIsPlaying(false);
         isPlayingRef.current = false;
         setSavedChunkIndex(currentChunkIndex);
+        setCurrentWordIndex(0);
+    };
+
+    const skipBackward = () => {
+        const newIndex = Math.max(0, currentChunkIndex - 1);
+        setCurrentChunkIndex(newIndex);
+        setSavedChunkIndex(newIndex);
+        setCurrentWordIndex(0);
+
+        if (isPlaying) {
+            speechSynthesis.cancel();
+            setTimeout(() => {
+                playTextLive(newIndex);
+            }, 100);
+        }
+    };
+
+    const skipForward = () => {
+        const newIndex = Math.min(textChunks.length - 1, currentChunkIndex + 1);
+        setCurrentChunkIndex(newIndex);
+        setSavedChunkIndex(newIndex);
+        setCurrentWordIndex(0);
+
+        if (isPlaying) {
+            speechSynthesis.cancel();
+            setTimeout(() => {
+                playTextLive(newIndex);
+            }, 100);
+        }
     };
 
     const formatFileSize = (bytes: number): string => {
@@ -512,11 +558,18 @@ const Converter = () => {
                     {extractedText && (
                         <div className="mb-6">
                             <h3 className="text-lg font-semibold mb-2">Book</h3>
-                            <div className="bg-gray-100 p-4 rounded-lg max-h-40 overflow-y-auto text-sm">
-                                {extractedText}
+                            <div className="bg-gray-100 p-4 rounded-lg max-h-60 overflow-y-auto text-sm">
+                                <div className="leading-relaxed">
+                                    {extractedText}
+                                </div>
                             </div>
                             <p className="text-xs text-gray-500 mt-2">
                                 {extractedText.length.toLocaleString()} characters | {textChunks.length} speech segments
+                                {textChunks.length > 0 && (
+                                    <span className="ml-2">
+                                        Current: {currentChunkIndex + 1}/{textChunks.length}
+                                    </span>
+                                )}
                             </p>
                         </div>
                     )}
@@ -525,23 +578,32 @@ const Converter = () => {
                         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                             <h3 className="text-lg font-semibold mb-4">Audio Controls</h3>
 
-                            <div className="flex flex-wrap gap-3 mb-4">
+                            <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
                                 <button
-                                    onClick={playLive}
-                                    disabled={isExtracting || isPlaying}
-                                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                                    onClick={skipBackward}
+                                    disabled={isExtracting || currentChunkIndex === 0}
+                                    className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 disabled:opacity-50 flex items-center gap-2"
                                 >
-                                    {<Play className="w-4 h-4" />}
-                                    Play
+                                    <SkipBack className="w-4 h-4" />
+                                    Previous
                                 </button>
 
                                 <button
-                                    onClick={stopPlayback}
-                                    disabled={!isPlaying}
-                                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                                    onClick={togglePlayback}
+                                    disabled={isExtracting}
+                                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
                                 >
-                                    <Square className="w-4 h-4" />
-                                    Stop
+                                    {isPlaying ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                                    {isPlaying ? 'Stop' : 'Play'}
+                                </button>
+
+                                <button
+                                    onClick={skipForward}
+                                    disabled={isExtracting || currentChunkIndex >= textChunks.length - 1}
+                                    className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 disabled:opacity-50 flex items-center gap-2"
+                                >
+                                    <SkipForward className="w-4 h-4" />
+                                    Next
                                 </button>
                             </div>
 
