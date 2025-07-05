@@ -9,7 +9,7 @@ export const parseBookInfo = (fileName: string) => {
             const title = parts.slice(0, -1).join(' - ');
             const author = parts[parts.length - 1];
 
-            const bookName = replaceTextParts(title);
+            const bookName = replaceTextParts(title).replace("Oceanofpdf.Com", "");
             const authorName = replaceTextParts(author);
 
 

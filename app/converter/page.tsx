@@ -549,8 +549,11 @@ const Converter = () => {
 
                             {file && (
                                 <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                                    <p className="text-sm font-medium">
+                                    <p className="text-xl font-bold font-">
                                         {parseBookInfo(file.name.toLowerCase()).bookName}
+                                    </p>
+                                    <p className="text-sm font-">
+                                        by {parseBookInfo(file.name.toLowerCase()).authorName}
                                     </p>
                                     <p className="text-xs text-gray-500">
                                         {formatFileSize(file.size)}
