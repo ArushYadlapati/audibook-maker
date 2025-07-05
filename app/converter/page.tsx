@@ -35,6 +35,7 @@ const Converter = () => {
     const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
     const [highlightedText, setHighlightedText] = useState<string>("");
     const [bookInfo, setBookInfo] = useState<BookInfo | null>(null);
+    const [coverImage, setCoverImage] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadSuccess, setUploadSuccess] = useState("");
     const [uploadError, setUploadError] = useState("");

@@ -1,44 +1,31 @@
-import { MongoClient, ServerApiVersion, Db, Collection } from 'mongodb';
-import * as dotenv from 'dotenv';
-import { NextApiRequest, NextApiResponse } from 'next';
-
-dotenv.config();
+import { MongoClient, ServerApiVersion } from 'mongodb';
+import { NextRequest, NextResponse } from 'next/server';
 
 const uri = "mongodb+srv://mongoBookDB:eUEeUHDJ3rW3PcGB@books.osrfk4l.mongodb.net/?retryWrites=true&w=majority&appName=books";
-// const uri = process.env.MONGODB_URI || '';
 
-let client: MongoClient;
-let database: Db;
-let collection: Collection;
-
-const connectToDatabase = async () => {
-    if (client && database && collection) return;  // Already connected
-
-    client = new MongoClient(uri, {
-        serverApi: {
-            version: ServerApiVersion.v1,
-            strict: true,
-            deprecationErrors: true,
-        },
-    });
-
-    await client.connect();
-    database = client.db('bookDB');
-    collection = database.collection('books');
-};
-
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ message: 'Method not allowed' });
-    }
-
+export async function POST(request: NextRequest) {
     try {
-        await connectToDatabase(); // Ensure DB is connected
+        const client = new MongoClient(uri, {
+            serverApi: {
+                version: ServerApiVersion.v1,
+                strict: true,
+                deprecationErrors: true,
+            },
+        });
 
-        const { bookName, authorName, bookText, fileName } = req.body;
+        await client.connect();
+        const database = client.db('bookDB');
+        const collection = database.collection('books');
+
+        const body = await request.json();
+        const { bookName, authorName, bookText, fileName } = body;
 
         if (!bookName || !authorName || !bookText) {
-            return res.status(400).json({ message: 'Missing required fields' });
+            await client.close();
+            return NextResponse.json(
+                { message: 'Missing required fields' },
+                { status: 400 }
+            );
         }
 
         const existingBook = await collection.findOne({
@@ -47,7 +34,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
 
         if (existingBook) {
-            return res.status(409).json({ message: 'Book already exists in database' });
+            await client.close();
+            return NextResponse.json(
+                { message: 'Book already exists in database' },
+                { status: 409 }
+            );
         }
 
         const bookDocument = {
@@ -60,13 +51,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         };
 
         const result = await collection.insertOne(bookDocument);
+        await client.close();
 
-        return res.status(201).json({
+        return NextResponse.json({
             message: 'Book uploaded successfully',
             bookId: result.insertedId,
-        });
+        }, { status: 201 });
+
     } catch (error) {
         console.error('Error uploading book:', error);
-        return res.status(500).json({ message: 'Internal server error' });
+        return NextResponse.json(
+            { message: 'Internal server error' },
+            { status: 500 }
+        );
     }
 }
