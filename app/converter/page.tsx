@@ -6,6 +6,7 @@ import Footer from "../components/Footer";
 import { AlertCircle, CheckCircle, Play, Settings, Square, Upload, SkipBack, SkipForward } from "lucide-react";
 
 import { PDFLib, LameJS } from "./convertHandler";
+import {parseBookInfo} from "@/app/api/bookParser";
 
 const Converter = () => {
     const [file, setFile] = useState<File | null>(null);
@@ -126,7 +127,15 @@ const Converter = () => {
         const uploadedFile = event.target.files?.[0];
         if (!uploadedFile) return;
 
-        const fileName = uploadedFile.name.toLowerCase();
+        const parsedFile = parseBookInfo(uploadedFile.name.toLowerCase());
+        const fileName = parsedFile.bookName;
+        const authorName = parsedFile.authorName;
+        const extension = parsedFile.authorName;
+        console.log("File Name: " + fileName);
+        console.log("Author Name: " + authorName);
+        console.log("OoP: " + parsedFile.isOceanPDF);
+        console.log("type: " + parsedFile.type);
+
         const validTypes = [".pdf", ".epub", ".txt"];
         const isValidType = validTypes.some(type => fileName.endsWith(type)) ||
             uploadedFile.type.includes('pdf') ||
