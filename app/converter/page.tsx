@@ -644,6 +644,38 @@ const Converter = () => {
                         </div>
                     )}
 
+                    {success && (
+                        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg flex items-center gap-2">
+                            <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                            <span>
+                                {success}
+                            </span>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center gap-2">
+                            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                            <span>
+                                {error}
+                            </span>
+                        </div>
+                    )}
+
+                    {uploadSuccess && (
+                        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg flex items-center gap-2">
+                            <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                            <span>{uploadSuccess}</span>
+                        </div>
+                    )}
+
+                    {uploadError && (
+                        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center gap-2">
+                            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                            <span>{uploadError}</span>
+                        </div>
+                    )}
+
                     {extractedText && (
                         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -749,38 +781,6 @@ const Converter = () => {
                                 </button>
                             </div>
 
-                        </div>
-                    )}
-
-                    {success && (
-                        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg flex items-center gap-2">
-                            <CheckCircle className="w-5 h-5 flex-shrink-0" />
-                            <span>
-                                {success}
-                            </span>
-                        </div>
-                    )}
-
-                    {error && (
-                        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center gap-2">
-                            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                            <span>
-                                {error}
-                            </span>
-                        </div>
-                    )}
-
-                    {uploadSuccess && (
-                        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg flex items-center gap-2">
-                            <CheckCircle className="w-5 h-5 flex-shrink-0" />
-                            <span>{uploadSuccess}</span>
-                        </div>
-                    )}
-
-                    {uploadError && (
-                        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center gap-2">
-                            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                            <span>{uploadError}</span>
                         </div>
                     )}
 
