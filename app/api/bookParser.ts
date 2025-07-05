@@ -12,7 +12,6 @@ export const parseBookInfo = (fileName: string) => {
             const bookName = replaceTextParts(title).replace("Oceanofpdf.Com", "");
             const authorName = replaceTextParts(author);
 
-
             return {
                 bookName,
                 authorName,

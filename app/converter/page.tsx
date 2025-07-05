@@ -146,7 +146,6 @@ const Converter = () => {
             return;
         }
 
-        setBookInfo(parseBookInfo(uploadedFile.name));
         setFile(uploadedFile);
         setError("");
         setSuccess("");
@@ -181,9 +180,6 @@ const Converter = () => {
 
                 setProgress((i / totalPages) * 100);
             }
-
-            const parsedInfo = parseBookInfo(file.name);
-            console.log("info: " + parsedInfo);
 
             return fullText.trim();
         } catch (error) {
@@ -260,11 +256,10 @@ const Converter = () => {
 
         try {
             let text = "";
-            const parsedFile = parseBookInfo(file.name);
+            const parsedFile = parseBookInfo(file.name.toLowerCase());
             const bookName = parsedFile.bookName || "";
             const authorName = parsedFile.authorName || "";
             const type = parsedFile.type || "";
-
 
             if (type === "pdf" || bookName.endsWith('.pdf')) {
                 text = await extractTextFromPDF(file);
@@ -286,8 +281,6 @@ const Converter = () => {
             setSavedChunkIndex(0);
             setSavedWordIndex(0);
             setCurrentWordIndex(0);
-
-            console.log(`Created ${chunks.length} chunks from ${text.length} characters`);
 
         } catch (err) {
             setError(`Failed to convert to audiobook.`);
@@ -530,7 +523,7 @@ const Converter = () => {
 
     const uploadToMongoDB = async () => {
         if (!extractedText || !bookInfo) {
-            setUploadError('Please extract text first');
+            setUploadError('Please convert text first');
             return;
         }
 
@@ -554,13 +547,13 @@ const Converter = () => {
             const data = await response.json();
 
             if (response.ok) {
-                setUploadSuccess(`Book "${bookInfo.bookName}" uploaded successfully to database!`);
+                setUploadSuccess(`"${bookInfo.bookName}" was successfully  uploaded to the Library!`);
                 setShowUploadModal(false);
             } else {
-                setUploadError(data.message || 'Failed to upload book');
+                setUploadError(data.message || "Failed to upload book");
             }
         } catch (error) {
-            setUploadError('Failed to upload book.');
+            setUploadError("Failed to upload book.");
         } finally {
             setIsUploading(false);
         }
@@ -633,6 +626,19 @@ const Converter = () => {
                                 className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
                             >
                                 {isExtracting ? "Converting..." : "Convert to AudioBook"}
+                            </button>
+                        </div>
+                    )}
+
+                    {extractedText && (
+                        <div className="mb-6 flex justify-center gap-4">
+                            <button
+                                onClick={() => setShowUploadModal(true)}
+                                disabled={isUploading}
+                                className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+                            >
+                                <Database className="w-4 h-4" />
+                                {isUploading ? 'Uploading...' : 'Upload to Database'}
                             </button>
                         </div>
                     )}
@@ -779,6 +785,37 @@ const Converter = () => {
 
                 </div>
             </div>
+
+            {showUploadModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                        <h3 className="text-lg font-semibold mb-4">Upload Book to Database</h3>
+                        <div className="mb-4">
+                            <p className="text-sm text-gray-600 mb-2">Book Details:</p>
+                            <p className="font-medium">{bookInfo?.bookName}</p>
+                            <p className="text-sm text-gray-500">by {bookInfo?.authorName}</p>
+                            <p className="text-xs text-gray-400 mt-1">
+                                {extractedText.length.toLocaleString()} characters
+                            </p>
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowUploadModal(false)}
+                                className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={uploadToMongoDB}
+                                disabled={isUploading}
+                                className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                            >
+                                {isUploading ? 'Uploading...' : 'Upload'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <Footer/>
         </div>

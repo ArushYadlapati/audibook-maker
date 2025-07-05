@@ -4,7 +4,9 @@ import { NextApiRequest, NextApiResponse } from 'next';
 
 dotenv.config();
 
-const uri = process.env.MONGODB_URI || '';
+const uri = "mongodb+srv://mongoBookDB:eUEeUHDJ3rW3PcGB@books.osrfk4l.mongodb.net/?retryWrites=true&w=majority&appName=books";
+// const uri = process.env.MONGODB_URI || '';
+
 let client: MongoClient;
 let database: Db;
 let collection: Collection;
@@ -25,7 +27,7 @@ const connectToDatabase = async () => {
     collection = database.collection('books');
 };
 
-const handler = async (req: NextApiRequest, res: NextApiResponse) => {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method not allowed' });
     }
@@ -54,7 +56,7 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
             bookText,
             fileName,
             uploadDate: new Date(),
-            textLength: bookText.length,
+            textLength: bookText.length
         };
 
         const result = await collection.insertOne(bookDocument);
@@ -67,6 +69,4 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
         console.error('Error uploading book:', error);
         return res.status(500).json({ message: 'Internal server error' });
     }
-};
-
-export default handler;
+}
