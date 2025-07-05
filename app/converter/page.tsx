@@ -125,24 +125,22 @@ const Converter = () => {
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const uploadedFile = event.target.files?.[0];
-        if (!uploadedFile) return;
+        if (!uploadedFile) {
+            return;
+        }
 
         const parsedFile = parseBookInfo(uploadedFile.name.toLowerCase());
-        const fileName = parsedFile.bookName;
-        const authorName = parsedFile.authorName;
-        const extension = parsedFile.authorName;
+        const fileName = parsedFile.bookName || "";
+        const authorName = parsedFile.authorName || "";
+        const type = parsedFile.type || "";
+        const validTypes = [".pdf", ".epub", ".txt"];
         console.log("File Name: " + fileName);
         console.log("Author Name: " + authorName);
         console.log("OoP: " + parsedFile.isOceanPDF);
         console.log("type: " + parsedFile.type);
 
-        const validTypes = [".pdf", ".epub", ".txt"];
-        const isValidType = validTypes.some(type => fileName.endsWith(type)) ||
-            uploadedFile.type.includes('pdf') ||
-            uploadedFile.type.includes('text');
-
-        if (!isValidType) {
-            setError('Please upload a PDF, EPUB, or TXT file');
+        if (!validTypes.includes(type)) {
+            setError("Please upload a PDF, EPUB, or TXT file");
             return;
         }
 
@@ -216,12 +214,12 @@ const Converter = () => {
             htmlFiles.sort();
 
             for (let i = 0; i < htmlFiles.length; i++) {
-                const htmlContent = await contents.file(htmlFiles[i]).async('string');
+                const htmlContent = await contents.file(htmlFiles[i]).async("string");
 
-                const tempDiv = document.createElement('div');
+                const tempDiv = document.createElement("div");
                 tempDiv.innerHTML = htmlContent;
 
-                const scripts = tempDiv.querySelectorAll('script, style');
+                const scripts = tempDiv.querySelectorAll("script, style");
                 scripts.forEach(el => el.remove());
 
                 const text = tempDiv.textContent || tempDiv.innerText || '';
@@ -245,29 +243,36 @@ const Converter = () => {
     };
 
     const extractText = async () => {
-        if (!file) return;
+        if (!file) {
+            return;
+        }
 
         setIsExtracting(true);
-        setError('');
-        setSuccess('');
+        setError("");
+        setSuccess("");
         setProgress(0);
 
         try {
-            let text = '';
-            const fileName = file.name.toLowerCase();
+            let text = "";
+            const parsedFile = parseBookInfo(file.name);
+            const fileName = parsedFile.bookName || "";
+            const authorName = parsedFile.authorName || "";
+            const type = parsedFile.type || "";
 
-            if (file.type.includes('pdf') || fileName.endsWith('.pdf')) {
+            console.log(type, fileName)
+
+            if (type === "pdf" || fileName.endsWith('.pdf')) {
                 text = await extractTextFromPDF(file);
-            } else if (fileName.endsWith('.epub')) {
+            } else if (type === "epub" || fileName.endsWith('.epub')) {
                 text = await extractTextFromEPUB(file);
-            } else if (fileName.endsWith('.txt') || file.type.includes('text')) {
+            } else if (type === "txt" || fileName.endsWith('.txt')) {
                 text = await extractTextFromTXT(file);
             }
 
             text = cleanText(text);
 
             setExtractedText(text);
-            setSuccess(`Text extracted successfully! (${text.length} characters)`);
+            setSuccess(`Text converted to audiobook successfully! (${text.length} characters)`);
 
             const chunks = splitTextIntoChunks(text);
             setTextChunks(chunks);
@@ -279,8 +284,7 @@ const Converter = () => {
             console.log(`Created ${chunks.length} chunks from ${text.length} characters`);
 
         } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-            setError(`Failed to extract text: ${errorMessage}`);
+            setError(`Failed to convert to audiobook.`);
         } finally {
             setIsExtracting(false);
             setProgress(0);
