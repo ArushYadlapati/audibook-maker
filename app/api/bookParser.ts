@@ -16,18 +16,18 @@ export const parseBookInfo = (fileName: string) => {
             return {
                 bookName,
                 authorName,
-                type: type,
-                isOceanPDF: true,
+                type
             };
+
         }
     }
 
     return {
         bookName: fileName,
         authorName: "Unknown",
-        type: type,
-        isOceanPDF: false,
+        type
     };
+
 };
 
 function replaceTextParts(text: string,): string {

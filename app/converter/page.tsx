@@ -3,17 +3,18 @@
 import React, {useEffect, useRef, useState} from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { AlertCircle, CheckCircle, Play, Settings, Square, Upload, SkipBack, SkipForward } from "lucide-react";
+import { AlertCircle, CheckCircle, Play, Settings, Square, Upload, SkipBack, SkipForward, Database } from "lucide-react";
 
 import { PDFLib, LameJS } from "./convertHandler";
 import {parseBookInfo} from "@/app/api/bookParser";
+import {BookInfo} from "@/app/api/book";
 
 const Converter = () => {
     const [file, setFile] = useState<File | null>(null);
     const [extractedText, setExtractedText] = useState<string>("");
     const [isExtracting, setIsExtracting] = useState<boolean>(false);
     const [, setAudioBlob] = useState<Blob | null>(null);
-    const [, setAudioUrl] = useState<string>('');
+    const [, setAudioUrl] = useState<string>("");
     const [, setCurrentUtterance] = useState<SpeechSynthesisUtterance | null>(null);
     const [progress, setProgress] = useState<number>(0);
     const [volume, setVolume] = useState<number>(1.0);
@@ -33,6 +34,11 @@ const Converter = () => {
     const [, setLamejsLib] = useState<LameJS | null>(null);
     const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
     const [highlightedText, setHighlightedText] = useState<string>("");
+    const [bookInfo, setBookInfo] = useState<BookInfo | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadSuccess, setUploadSuccess] = useState("");
+    const [uploadError, setUploadError] = useState("");
+    const [showUploadModal, setShowUploadModal] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -134,22 +140,19 @@ const Converter = () => {
         const authorName = parsedFile.authorName || "";
         const type = parsedFile.type || "";
         const validTypes = ["pdf", "epub", "txt"];
-        console.log("File Name:" + fileName);
-        console.log("Author Name:" + authorName);
-        console.log("OoP:" + parsedFile.isOceanPDF);
-        console.log("type:" + parsedFile.type);
 
         if (!validTypes.includes(type)) {
             setError("Please upload a PDF, EPUB, or TXT file");
             return;
         }
 
+        setBookInfo(parseBookInfo(uploadedFile.name));
         setFile(uploadedFile);
-        setError('');
-        setSuccess('');
-        setAudioUrl('');
+        setError("");
+        setSuccess("");
+        setAudioUrl("");
         setAudioBlob(null);
-        setExtractedText('');
+        setExtractedText("");
         setProgress(0);
         setCurrentChunkIndex(0);
         setSavedChunkIndex(0);
@@ -179,6 +182,9 @@ const Converter = () => {
                 setProgress((i / totalPages) * 100);
             }
 
+            const parsedInfo = parseBookInfo(file.name);
+            console.log("info: " + parsedInfo);
+
             return fullText.trim();
         } catch (error) {
             return "";
@@ -188,7 +194,7 @@ const Converter = () => {
     const extractTextFromEPUB = async (file: File): Promise<string> => {
         try {
             const JSZip = await new Promise<any>((resolve) => {
-                const script = document.createElement('script');
+                const script = document.createElement("script");
                 script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
                 script.onload = () => {
                     if (window.JSZip) {
@@ -202,7 +208,7 @@ const Converter = () => {
             const zip = new JSZip();
             const contents = await zip.loadAsync(file);
 
-            let fullText = '';
+            let fullText = "";
             const htmlFiles: string[] = [];
 
             contents.forEach((relativePath: string, zipEntry: any) => {
@@ -222,8 +228,8 @@ const Converter = () => {
                 const scripts = tempDiv.querySelectorAll("script, style");
                 scripts.forEach(el => el.remove());
 
-                const text = tempDiv.textContent || tempDiv.innerText || '';
-                fullText += text + '\n\n';
+                const text = tempDiv.textContent || tempDiv.innerText || "";
+                fullText += text + "\n\n";
 
                 setProgress(((i + 1) / htmlFiles.length) * 100);
             }
@@ -255,22 +261,22 @@ const Converter = () => {
         try {
             let text = "";
             const parsedFile = parseBookInfo(file.name);
-            const fileName = parsedFile.bookName || "";
+            const bookName = parsedFile.bookName || "";
             const authorName = parsedFile.authorName || "";
             const type = parsedFile.type || "";
 
-            console.log(type, fileName)
 
-            if (type === "pdf" || fileName.endsWith('.pdf')) {
+            if (type === "pdf" || bookName.endsWith('.pdf')) {
                 text = await extractTextFromPDF(file);
-            } else if (type === "epub" || fileName.endsWith('.epub')) {
+            } else if (type === "epub" || bookName.endsWith('.epub')) {
                 text = await extractTextFromEPUB(file);
-            } else if (type === "txt" || fileName.endsWith('.txt')) {
+            } else if (type === "txt" || bookName.endsWith('.txt')) {
                 text = await extractTextFromTXT(file);
             }
 
             text = cleanText(text);
 
+            setBookInfo({ bookName: bookName, authorName: authorName, type: type });
             setExtractedText(text);
             setSuccess(`Text converted to audiobook successfully! (${text.length} characters)`);
 
@@ -522,6 +528,44 @@ const Converter = () => {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
+    const uploadToMongoDB = async () => {
+        if (!extractedText || !bookInfo) {
+            setUploadError('Please extract text first');
+            return;
+        }
+
+        setIsUploading(true);
+        setUploadError('');
+        setUploadSuccess('');
+
+        try {
+            const response = await fetch('/api/books', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    bookName: bookInfo.bookName,
+                    authorName: bookInfo.authorName,
+                    bookText: extractedText,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                setUploadSuccess(`Book "${bookInfo.bookName}" uploaded successfully to database!`);
+                setShowUploadModal(false);
+            } else {
+                setUploadError(data.message || 'Failed to upload book');
+            }
+        } catch (error) {
+            setUploadError('Failed to upload book.');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50">
             <Navbar />
@@ -716,6 +760,20 @@ const Converter = () => {
                             <span>
                                 {error}
                             </span>
+                        </div>
+                    )}
+
+                    {uploadSuccess && (
+                        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg flex items-center gap-2">
+                            <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                            <span>{uploadSuccess}</span>
+                        </div>
+                    )}
+
+                    {uploadError && (
+                        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center gap-2">
+                            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                            <span>{uploadError}</span>
                         </div>
                     )}
 
