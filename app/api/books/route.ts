@@ -1,7 +1,7 @@
 import { MongoClient, ServerApiVersion } from 'mongodb';
 import { NextRequest, NextResponse } from 'next/server';
 
-const uri = "mongodb+srv://mongoBookDB:eUEeUHDJ3rW3PcGB@books.osrfk4l.mongodb.net/?retryWrites=true&w=majority&appName=books";
+const uri = "mongodb+srv://mongoBookDB:eUEeUHDJ3rW3PcGB@books.osrfk4l.mongodb.net/bookDB?retryWrites=true&w=majority&ssl=true&tlsInsecure=false";
 
 export async function POST(request: NextRequest) {
     try {
