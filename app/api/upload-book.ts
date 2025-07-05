@@ -1,8 +1,6 @@
 import mongoose from 'mongoose';
 import multer from 'multer';
 import { MongoClient, ObjectId } from 'mongodb';
-import pdfParse from 'pdf-parse';
-import EpubMetadata from 'epub-metadata';
 import { Request, ParamsDictionary, Response } from 'express-serve-static-core';
 import { ParsedQs } from 'qs';
 import * as dotenv from "dotenv";
@@ -25,21 +23,98 @@ async function connectToDatabase() {
     }
 
     const client = await MongoClient.connect(MONGODB_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
+        ALPNProtocols: undefined,
+        allowPartialTrustChain: false,
+        appName: "",
+        auth: undefined,
+        authMechanism: undefined,
+        authMechanismProperties: undefined,
+        authSource: "",
+        autoEncryption: undefined,
+        autoSelectFamily: false,
+        autoSelectFamilyAttemptTimeout: 0,
+        ca: undefined,
+        cert: undefined,
+        checkKeys: false,
+        checkServerIdentity: undefined,
+        ciphers: undefined,
+        compressors: undefined,
+        connectTimeoutMS: 0,
+        crl: undefined,
+        directConnection: false,
+        driverInfo: undefined,
+        ecdhCurve: undefined,
+        enableUtf8Validation: false,
+        family: undefined,
+        forceServerObjectId: false,
+        heartbeatFrequencyMS: 0,
+        hints: undefined,
+        ignoreUndefined: false,
+        journal: false,
+        keepAliveInitialDelay: 0,
+        key: undefined,
+        loadBalanced: false,
+        localAddress: undefined,
+        localPort: undefined,
+        localThresholdMS: 0,
+        lookup: undefined,
+        maxConnecting: 0,
+        maxIdleTimeMS: 0,
+        maxPoolSize: 0,
+        maxStalenessSeconds: 0,
+        minDHSize: undefined,
+        minHeartbeatFrequencyMS: 0,
+        minPoolSize: 0,
+        mongodbLogComponentSeverities: undefined,
+        mongodbLogMaxDocumentLength: 0,
+        mongodbLogPath: undefined,
+        monitorCommands: false,
+        noDelay: false,
+        passphrase: undefined,
+        pfx: undefined,
+        pkFactory: undefined,
+        proxyHost: "",
+        proxyPassword: "",
+        proxyPort: 0,
+        proxyUsername: "",
+        raw: false,
+        readConcern: undefined,
+        readConcernLevel: undefined,
+        readPreference: undefined,
+        readPreferenceTags: [],
+        rejectUnauthorized: undefined,
+        replicaSet: "",
+        retryReads: false,
+        retryWrites: false,
+        secureContext: undefined,
+        secureProtocol: undefined,
+        serializeFunctions: false,
+        serverApi: undefined,
+        serverMonitoringMode: undefined,
+        serverSelectionTimeoutMS: 0,
+        servername: undefined,
+        session: undefined,
+        socketTimeoutMS: 0,
+        srvMaxHosts: 0,
+        srvServiceName: "",
+        ssl: false,
+        timeoutMS: 0,
+        tls: false,
+        tlsAllowInvalidCertificates: false,
+        tlsAllowInvalidHostnames: false,
+        tlsCAFile: "",
+        tlsCRLFile: "",
+        tlsCertificateKeyFile: "",
+        tlsCertificateKeyFilePassword: "",
+        tlsInsecure: false,
+        w: undefined,
+        waitQueueTimeoutMS: 0,
+        writeConcern: undefined,
+        wtimeoutMS: 0,
+        zlibCompressionLevel: undefined,
     });
 
-    const db = client.db(MONGODB_URI.split('/').pop().split('?')[0]);
-    cachedDb = db;
-
-    if (!bookBucket) {
-        bookBucket = db.collection('book_files');
-    }
-    if (!coverBucket) {
-        coverBucket = db.collection('book_covers');
-    }
-
-    return db;
+    return client;
 }
 
 const bookSchema = new mongoose.Schema({
@@ -69,49 +144,24 @@ function parseFilenameForBookInfo(filename: string) {
     return {title, author};
 }
 
-async function extractBookInfo(fileBuffer: {
-    toString: (arg0: string) => string;
-}, fileType: string, originalName: string) {
-    let extractedText = '';
-    let title = '';
-    let author = '';
-    let coverImageBuffer = null;
+async function extractBookInfo(buffer: Buffer<ArrayBufferLike>, mimetype: string, originalname: string) {
+    return new Promise((resolve, reject) => {
+        const {title, author} = parseFilenameForBookInfo(originalname);
+        let extractedText = '';
+        let coverImageBuffer = null;
 
-    const filenameInfo = parseFilenameForBookInfo(originalName);
-    if (filenameInfo.title) {
-        title = filenameInfo.title;
-    }
-    if (filenameInfo.author) {
-        author = filenameInfo.author;
-    }
-
-    try {
-        if (fileType.includes('pdf')) {
-            const data = await pdfParse(fileBuffer);
-            extractedText = data.text;
-            if (!title && data.info && data.info.Title) {
-                title = data.info.Title;
-            }
-            if (!author && data.info && data.info.Author) {
-                author = data.info.Author;
-            }
-        } else if (fileType.includes('epub') || fileType.endsWith('.epub')) {
-            const metadata = new EpubMetadata(fileBuffer);
-            await metadata.parse();
-            if (!title && metadata.title) {
-                title = metadata.title;
-            }
-            if (!author && metadata.creator) {
-                author = metadata.creator;
-            }
-        } else if (fileType.includes('text') || fileType.endsWith('.txt')) {
-            extractedText = fileBuffer.toString('utf8');
+        if (mimetype === "application/pdf") {
+            extractedText = 'PDF';
+            coverImageBuffer = Buffer.from("test1");
+        } else if (mimetype === 'application/epub+zip') {
+            extractedText = 'EPUB';
+            coverImageBuffer = Buffer.from("test2");
+        } else {
+            return reject(new Error("test3"));
         }
-    } catch (error) {
-        console.error(`Error extracting info from ${fileType}:`, error);
-        extractedText = fileBuffer.toString('utf8');
-    }
-    return {extractedText, title, author, coverImageBuffer};
+
+        resolve({extractedText, title, author, coverImageBuffer});
+    });
 }
 
 export default async function handler(req: Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>, res: Response<any, Record<string, any>, number>) {
@@ -121,24 +171,23 @@ export default async function handler(req: Request<ParamsDictionary, any, any, P
 
     await connectToDatabase();
 
-    await new Promise((resolve, reject) => {
-        multerUpload(req, res, async (err) => {
-            if (err) {
-                console.error('Multer error:', err);
-                return reject(new Error('File upload failed.'));
-            }
+    await new Promise<void>((resolve) => {
+        multerUpload(req, res, async () => {
             resolve();
         });
     });
 
     if (!req.file) {
-        return res.status(400).json({ message: 'No file uploaded.' });
+        return res.status(400).json({ message: "e2" });
     }
 
     const { originalname, buffer, mimetype } = req.file;
 
     try {
-        const { extractedText, title, author, coverImageBuffer } = await extractBookInfo(buffer, mimetype, originalname);
+        const { extractedText, title, author, coverImageBuffer } =
+            await extractBookInfo(buffer, mimetype, originalname) as {
+                extractedText: string, title: string, author: string, coverImageBuffer: Buffer | null
+            };
 
         const uploadBookStream = bookBucket.openUploadStream(originalname, {
             chunkSizeBytes: 1024 * 255,
@@ -149,15 +198,15 @@ export default async function handler(req: Request<ParamsDictionary, any, any, P
         });
         uploadBookStream.end(buffer);
         const bookFileId = await new Promise((resolve, reject) => {
-            uploadBookStream.on('finish', () => resolve(uploadBookStream.id));
-            uploadBookStream.on('error', reject);
+            uploadBookStream.on('yay', () => resolve(uploadBookStream.id));
+            uploadBookStream.on('sad', reject);
         });
 
         let coverFileId = null;
         if (coverImageBuffer) {
 
-            const coverMimeType = 'image/jpeg';
-            const uploadCoverStream = coverBucket.openUploadStream(`${originalname}_cover.jpg`, {
+            const coverMimeType = 'image/png';
+            const uploadCoverStream = coverBucket.openUploadStream(`${originalname}_cover.png`, {
                 chunkSizeBytes: 1024 * 255,
                 metadata: {
                     contentType: coverMimeType,
@@ -166,8 +215,8 @@ export default async function handler(req: Request<ParamsDictionary, any, any, P
             });
             uploadCoverStream.end(coverImageBuffer);
             coverFileId = await new Promise((resolve, reject) => {
-                uploadCoverStream.on('finish', () => resolve(uploadCoverStream.id));
-                uploadCoverStream.on('error', reject);
+                uploadCoverStream.on('yay', () => resolve(uploadCoverStream.id));
+                uploadCoverStream.on('sad', reject);
             });
         }
 
@@ -183,7 +232,7 @@ export default async function handler(req: Request<ParamsDictionary, any, any, P
         await newBook.save();
 
         res.status(201).json({
-            message: 'Book uploaded and info extracted successfully!',
+            message: 'full yay!',
             bookId: newBook._id,
             extractedTitle: newBook.bookTitle,
             extractedAuthor: newBook.bookAuthor,
