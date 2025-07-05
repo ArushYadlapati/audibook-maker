@@ -25,7 +25,7 @@ export const parseBookInfo = (fileName: string) => {
     return {
         bookName: fileName,
         authorName: "Unknown",
-        fileType: type,
+        type: type,
         isOceanPDF: false,
     };
 };

@@ -133,11 +133,11 @@ const Converter = () => {
         const fileName = parsedFile.bookName || "";
         const authorName = parsedFile.authorName || "";
         const type = parsedFile.type || "";
-        const validTypes = [".pdf", ".epub", ".txt"];
-        console.log("File Name: " + fileName);
-        console.log("Author Name: " + authorName);
-        console.log("OoP: " + parsedFile.isOceanPDF);
-        console.log("type: " + parsedFile.type);
+        const validTypes = ["pdf", "epub", "txt"];
+        console.log("File Name:" + fileName);
+        console.log("Author Name:" + authorName);
+        console.log("OoP:" + parsedFile.isOceanPDF);
+        console.log("type:" + parsedFile.type);
 
         if (!validTypes.includes(type)) {
             setError("Please upload a PDF, EPUB, or TXT file");
@@ -155,7 +155,7 @@ const Converter = () => {
         setSavedChunkIndex(0);
         setSavedWordIndex(0);
         setCurrentWordIndex(0);
-        setHighlightedText('');
+        setHighlightedText("");
     };
 
     const extractTextFromPDF = async (file: File): Promise<string> => {
@@ -550,7 +550,7 @@ const Converter = () => {
                             {file && (
                                 <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                                     <p className="text-sm font-medium">
-                                        {file.name}
+                                        {parseBookInfo(file.name.toLowerCase()).bookName}
                                     </p>
                                     <p className="text-xs text-gray-500">
                                         {formatFileSize(file.size)}
