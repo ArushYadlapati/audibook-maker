@@ -1,19 +1,36 @@
 import { MongoClient, ServerApiVersion } from 'mongodb';
 import { NextRequest, NextResponse } from 'next/server';
 
-const uri = "mongodb+srv://mongoBookDB:eUEeUHDJ3rW3PcGB@books.osrfk4l.mongodb.net/bookDB?retryWrites=true&w=majority&ssl=true&tlsInsecure=false";
+const uri = "mongodb+srv://mongoBookDB:eUEeUHDJ3rW3PcGB@books.osrfk4l.mongodb.net/?retryWrites=true&w=majority&appName=books";
 
 export async function POST(request: NextRequest) {
+    let client: MongoClient | null = null;
+
     try {
-        const client = new MongoClient(uri, {
+        client = new MongoClient(uri, {
             serverApi: {
                 version: ServerApiVersion.v1,
                 strict: true,
                 deprecationErrors: true,
             },
+            tls: true,
+            tlsInsecure: false,
+            tlsAllowInvalidHostnames: false,
+            tlsAllowInvalidCertificates: false,
+            connectTimeoutMS: 30000,
+            socketTimeoutMS: 30000,
+            serverSelectionTimeoutMS: 30000,
+            maxPoolSize: 10,
+            minPoolSize: 1,
+            maxIdleTimeMS: 30000,
+            retryWrites: true,
+            retryReads: true,
         });
 
         await client.connect();
+
+        await client.db("admin").command({ ping: 1 });
+
         const database = client.db('bookDB');
         const collection = database.collection('books');
 
@@ -21,7 +38,6 @@ export async function POST(request: NextRequest) {
         const { bookName, authorName, bookText, fileName } = body;
 
         if (!bookName || !authorName || !bookText) {
-            await client.close();
             return NextResponse.json(
                 { message: 'Missing required fields' },
                 { status: 400 }
@@ -34,7 +50,6 @@ export async function POST(request: NextRequest) {
         });
 
         if (existingBook) {
-            await client.close();
             return NextResponse.json(
                 { message: 'Book already exists in database' },
                 { status: 409 }
@@ -51,7 +66,6 @@ export async function POST(request: NextRequest) {
         };
 
         const result = await collection.insertOne(bookDocument);
-        await client.close();
 
         return NextResponse.json({
             message: 'Book uploaded successfully',
@@ -64,5 +78,13 @@ export async function POST(request: NextRequest) {
             { message: 'Internal server error' },
             { status: 500 }
         );
+    } finally {
+        if (client) {
+            try {
+                await client.close();
+            } catch (closeError) {
+                console.error('Error closing MongoDB connection:', closeError);
+            }
+        }
     }
 }
