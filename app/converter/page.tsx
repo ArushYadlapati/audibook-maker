@@ -666,7 +666,7 @@ const Converter = () => {
               <button
                 onClick={extractText}
                 disabled={isExtracting}
-                className="cursor-pointer bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
               >
                 {isExtracting ? "Converting..." : "Convert to AudioBook"}
               </button>
