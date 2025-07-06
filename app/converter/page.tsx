@@ -34,7 +34,7 @@ const Converter = () => {
     const [pdfLib, setPdfLib] = useState<PDFLib | null>(null);
     const [, setLamejsLib] = useState<LameJS | null>(null);
     const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
-    const [wordTrackingInterval, setWordTrackingInterval] = useState<NodeJS.Timeout | null>(null);
+    const [isCleanTextChecked, setIsCleanTextChecked] = useState<boolean>(true);
     const [highlightedText, setHighlightedText] = useState<string>("");
     const [bookInfo, setBookInfo] = useState<BookInfo | null>(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -245,7 +245,7 @@ const Converter = () => {
         }
     };
 
-    const extractText = async () => {
+    const extractText = async (clean: boolean) => {
         if (!file) {
             return;
         }
@@ -270,7 +270,7 @@ const Converter = () => {
                 text = await extractTextFromTXT(file);
             }
 
-            text = cleanText(text);
+            text = clean ? cleanText(text) : text;
 
             setBookInfo({ bookName: bookName, authorName: authorName, type: type });
             setExtractedText(text);
@@ -634,11 +634,18 @@ const Converter = () => {
                     )}
 
                     {file && !extractedText && (
-                        <div className="mb-6 flex justify-center">
-                            <button
-                                onClick={extractText}
-                                disabled={isExtracting}
-                                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                        <div className="mb-6 flex flex-col items-center gap-4">
+                            <div className="flex items-center">
+                                <input type="checkbox" id="cleanText" checked={isCleanTextChecked}
+                                       onChange={(e) => setIsCleanTextChecked(e.target.checked)}
+                                       className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                />
+                                <label htmlFor="cleanText" className="text-gray-700">
+                                    Clean Text (attempts to remove unnecessary content)
+                                </label>
+                            </div>
+                            <button onClick={() => extractText(isCleanTextChecked)} disabled={isExtracting}
+                                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
                             >
                                 {isExtracting ? "Converting..." : "Convert to AudioBook"}
                             </button>
