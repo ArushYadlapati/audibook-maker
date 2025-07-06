@@ -627,7 +627,7 @@ const Converter = () => {
               </button>
 
               {file && (
-                <div className="mt-4 p-3 bg-gray-400 text-black rounded-lg">
+                <div className="mt-4 p-3 bg-blue-50 dark:bg-gray-400 text-black rounded-lg">
                   <p className="text-xl font-bold font-">
                     {parseBookInfo(file.name.toLowerCase()).bookName}
                   </p>
@@ -666,7 +666,7 @@ const Converter = () => {
               <button
                 onClick={extractText}
                 disabled={isExtracting}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                className="cursor-pointer bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
               >
                 {isExtracting ? "Converting..." : "Convert to AudioBook"}
               </button>
@@ -862,14 +862,18 @@ const Converter = () => {
 
       {showUploadModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold mb-4">
               Upload Book to Database
             </h3>
             <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-2">Book Details:</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                Book Details:
+              </p>
               <p className="font-medium">{bookInfo?.bookName}</p>
-              <p className="text-sm text-gray-500">by {bookInfo?.authorName}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                by {bookInfo?.authorName}
+              </p>
               <p className="text-xs text-gray-400 mt-1">
                 {extractedText.length.toLocaleString()} characters
               </p>
@@ -877,14 +881,14 @@ const Converter = () => {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowUploadModal(false)}
-                className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
+                className="cursor-pointer flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
               >
                 Cancel
               </button>
               <button
                 onClick={uploadToMongoDB}
                 disabled={isUploading}
-                className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                className="cursor-pointer flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50"
               >
                 {isUploading ? "Uploading..." : "Upload"}
               </button>
