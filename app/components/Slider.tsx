@@ -1,25 +1,102 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Slider from "react-slick";
-import rawBooks from "../data/books.json";
 import Link from "next/link";
 
 type Book = {
-  id: number;
-  title: string;
-  imageUrl: string;
-  author: string;
-  genre: string;
+  _id: string;
+  bookName: string;
+  authorName: string;
+  isbn?: string;
+  bookText: string;
+  uploadDate: string;
 };
 
-const books: Book[] = rawBooks as Book[];
+async function fetchCoverByISBN(isbn: string): Promise<string | null> {
+  if (!isbn) return null;
+  return `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
+}
 
-function SimpleSlider() {
-  const [flippedBookId, setFlippedBookId] = useState<number | null>(null);
+async function fetchCoverBySearch(
+  title: string,
+  author: string
+): Promise<string | null> {
+  const url = `https://openlibrary.org/search.json?title=${encodeURIComponent(
+    title
+  )}&author=${encodeURIComponent(author)}&limit=1`;
 
-  const toggleFlip = (bookId: number) => {
-    setFlippedBookId(flippedBookId === bookId ? null : bookId);
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.docs && data.docs.length > 0) {
+      const doc = data.docs[0];
+      if (doc.cover_i) {
+        return `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function getCover(book: Book): Promise<string> {
+  if (book.isbn) {
+    const coverByISBN = await fetchCoverByISBN(book.isbn);
+    if (coverByISBN) return coverByISBN;
+  }
+  const coverBySearch = await fetchCoverBySearch(
+    book.bookName,
+    book.authorName
+  );
+  if (coverBySearch) return coverBySearch;
+  return "/fallback-book-cover.jpg";
+}
+
+export default function SimpleSlider() {
+  const [books, setBooks] = useState<Book[]>([]);
+  const [covers, setCovers] = useState<Record<string, string>>({});
+  const [flippedBookId, setFlippedBookId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadBooks() {
+      setIsLoading(true);
+      const res = await fetch("/api/books");
+      const data = await res.json();
+      if (data.success) {
+        const sorted = data.books
+          .sort(
+            (a: Book, b: Book) =>
+              new Date(b.uploadDate).getTime() -
+              new Date(a.uploadDate).getTime()
+          )
+          .slice(0, 10);
+        setBooks(sorted);
+      }
+      setIsLoading(false);
+    }
+    loadBooks();
+  }, []);
+
+  useEffect(() => {
+    async function loadCovers() {
+      const newCovers: Record<string, string> = {};
+      await Promise.all(
+        books.map(async (book) => {
+          const coverUrl = await getCover(book);
+          newCovers[book._id] = coverUrl;
+        })
+      );
+      setCovers(newCovers);
+    }
+    if (books.length > 0) loadCovers();
+  }, [books]);
+
+  const toggleFlip = (id: string) => {
+    setFlippedBookId(flippedBookId === id ? null : id);
   };
 
   const settings = {
@@ -29,101 +106,72 @@ function SimpleSlider() {
     autoplaySpeed: 2500,
     slidesToShow: 5,
     slidesToScroll: 5,
-    initialSlide: 0,
     responsive: [
-      {
-        breakpoint: 1024,
-        settings: {
-          slidesToShow: 3,
-          slidesToScroll: 3,
-          infinite: true,
-          dots: true,
-        },
-      },
-      {
-        breakpoint: 600,
-        settings: {
-          slidesToShow: 2,
-          slidesToScroll: 2,
-          initialSlide: 2,
-        },
-      },
-      {
-        breakpoint: 480,
-        settings: {
-          slidesToShow: 1,
-          slidesToScroll: 1,
-        },
-      },
+      { breakpoint: 1024, settings: { slidesToShow: 3, slidesToScroll: 3 } },
+      { breakpoint: 600, settings: { slidesToShow: 2, slidesToScroll: 2 } },
+      { breakpoint: 480, settings: { slidesToShow: 1, slidesToScroll: 1 } },
     ],
   };
 
   return (
-    <div
-      className="slider-container p-4 relative"
-      onMouseMove={(e) => {
-        const slider = e.currentTarget.querySelector(
-          ".slick-list"
-        ) as HTMLElement | null;
-        if (slider) {
-          const mouseX = e.clientX - slider.getBoundingClientRect().left;
-          const width = slider.offsetWidth;
-          const speedAdjust = (mouseX / width - 0.5) * 50;
-          slider.style.transition = "transform 0.1s ease-out";
-          slider.style.transform = `translateX(${speedAdjust}px)`;
-        }
-      }}
-    >
+    <div className="slider-container p-4">
       <Slider {...settings}>
-        {books.map((book) => (
-          <div key={book.id} className="p-2">
-            <div
-              className="relative w-full h-[400px] cursor-pointer"
-              onClick={() => toggleFlip(book.id)}
-            >
-              <div
-                className={`relative w-full h-[400px] transition-transform duration-500 transform-style-preserve-3d ${
-                  flippedBookId === book.id ? "rotate-y-180" : ""
-                }`}
-                style={{ transformStyle: "preserve-3d" }}
-              >
-                {/* Front of the card */}
+        {isLoading
+          ? [...Array(10)].map((_, i) => (
+              <div key={i} className="p-2">
+                <div className="relative w-full h-[500px] bg-gray-300 rounded-lg animate-pulse" />
+              </div>
+            ))
+          : books.map((book) => (
+              <div key={book._id} className="p-2">
                 <div
-                  className="absolute w-full h-[400px] backface-hidden rounded overflow-hidden shadow-lg hover:scale-105 transition-transform duration-200"
-                  style={{ backfaceVisibility: "hidden" }}
+                  className="relative w-full h-[500px] cursor-pointer"
+                  onClick={() => toggleFlip(book._id)}
                 >
-                  <img
-                    src={book.imageUrl}
-                    alt={book.title}
-                    className="w-full h-[400px] object-cover"
-                  />
-                </div>
-                <div
-                  className="absolute w-full h-[400px] backface-hidden rotate-y-180 bg-white rounded-lg shadow-lg p-4 flex flex-col justify-center items-center"
-                  style={{ backfaceVisibility: "hidden" }}
-                >
-                  <h2 className="text-xl font-semibold mb-2 text-center">
-                    {book.title}
-                  </h2>
-                  <p className="text-gray-700 mb-1">
-                    <strong>Author:</strong> {book.author}
-                  </p>
-                  <p className="text-gray-700 mb-4">
-                    <strong>Genre:</strong> {book.genre}
-                  </p>
-                  <Link href="/converter">
-                    <button className="cursor-pointer bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900">
-                      Convert
-                    </button>
-                  </Link>
+                  <div
+                    className={`relative w-full h-[600px] transition-transform duration-500 transform-style-preserve-3d ${
+                      flippedBookId === book._id ? "rotate-y-180" : ""
+                    }`}
+                    style={{ transformStyle: "preserve-3d" }}
+                  >
+                    {/* Front */}
+                    <div
+                      className="absolute w-full h-[600px] backface-hidden rounded overflow-hidden shadow-lg hover:scale-105 transition-transform duration-200"
+                      style={{ backfaceVisibility: "hidden" }}
+                    >
+                      <img
+                        src={covers[book._id] || "/fallback-book-cover.jpg"}
+                        alt={book.bookName}
+                        className="w-full h-[500px] object-cover"
+                      />
+                    </div>
+
+                    {/* Back */}
+                    <div
+                      className="absolute w-full h-[500px] backface-hidden rotate-y-180 bg-white rounded-lg shadow-lg p-4 flex flex-col justify-center items-center"
+                      style={{ backfaceVisibility: "hidden" }}
+                    >
+                      <h2 className="text-xl font-semibold mb-2 text-center text-black">
+                        {book.bookName}
+                      </h2>
+                      <p className="text-gray-700 mb-1">
+                        <strong>Author:</strong> {book.authorName}
+                      </p>
+                      <p className="text-gray-700 mb-4 text-sm">
+                        Uploaded:{" "}
+                        {new Date(book.uploadDate).toLocaleDateString()}
+                      </p>
+                      <Link href="/library">
+                        <button className="cursor-pointer bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900">
+                          Go to Library
+                        </button>
+                      </Link>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        ))}
+            ))}
       </Slider>
     </div>
   );
 }
-
-export default SimpleSlider;

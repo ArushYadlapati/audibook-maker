@@ -3,7 +3,7 @@ import { Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
 
 const Footer = () => {
   return (
-    <footer className="bg-black text-white mt-20">
+    <footer className="bg-black dark:bg-gray-700 text-white mt-20">
       <div className="max-w-7xl mx-auto py-10 px-4 grid grid-cols-1 md:grid-cols-3 gap-8">
         <div>
           <h1 className="text-2xl font-bold mb-2">AudioBook Maker</h1>
@@ -21,7 +21,7 @@ const Footer = () => {
               <a href="/">Home</a>
             </li>
             <li>
-              <a href="/converter">Converter</a>
+              <a href="/converter">Converter </a>
             </li>
             <li>
               <a href="/library">Library</a>
@@ -47,7 +47,7 @@ const Footer = () => {
         </div>
       </div>
 
-      <div className="text-center text-gray-500 text-sm border-t border-gray-800 py-4">
+      <div className="text-center text-gray-400 text-sm border-t border-gray-800 py-4">
         &copy; {new Date().getFullYear()} AudioBook Maker. Freedom Week Project
       </div>
     </footer>

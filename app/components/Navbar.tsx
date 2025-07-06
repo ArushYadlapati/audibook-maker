@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React from "react";
+import ThemeToggle from "./ThemeToggle";
 
 const Navbar = () => {
   const pathname = usePathname();
@@ -9,8 +10,8 @@ const Navbar = () => {
     return pathname === href || pathname.startsWith(href + "/");
   };
   return (
-    <div>
-      <div className="flex items-center justify-between mt-10">
+    <div className="bg-white dark:bg-gray-700">
+      <div className="flex items-center justify-between pt-10">
         <div
           className={`font-bold ${
             isActive("/") ? "underline" : "hover:underline"
@@ -20,7 +21,8 @@ const Navbar = () => {
             <h1 className="text-3xl font-bold ml-10">AudioBook Maker</h1>
           </Link>
         </div>
-        <div className="flex gap-4 mr-10">
+        <div className="flex gap-4 mr-10 items-center">
+          <ThemeToggle />
           <Link
             href="/converter"
             className={`font-bold ${
