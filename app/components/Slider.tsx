@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Slider from "react-slick";
 import rawBooks from "../data/books.json";
+import Link from "next/link";
 
 type Book = {
   id: number;
@@ -58,33 +59,49 @@ function SimpleSlider() {
   };
 
   return (
-    <div className="slider-container p-4">
+    <div
+      className="slider-container p-4 relative"
+      onMouseMove={(e) => {
+        const slider = e.currentTarget.querySelector(
+          ".slick-list"
+        ) as HTMLElement | null;
+        if (slider) {
+          const mouseX = e.clientX - slider.getBoundingClientRect().left;
+          const width = slider.offsetWidth;
+          const speedAdjust = (mouseX / width - 0.5) * 50;
+          slider.style.transition = "transform 0.1s ease-out";
+          slider.style.transform = `translateX(${speedAdjust}px)`;
+        }
+      }}
+    >
       <Slider {...settings}>
         {books.map((book) => (
           <div key={book.id} className="p-2">
             <div
-              className="relative w-full h-[350px] cursor-pointer"
+              className="relative w-full h-[400px] cursor-pointer"
               onClick={() => toggleFlip(book.id)}
             >
               <div
-                className={`relative w-full h-full transition-transform duration-500 transform-style-preserve-3d ${
+                className={`relative w-full h-[400px] transition-transform duration-500 transform-style-preserve-3d ${
                   flippedBookId === book.id ? "rotate-y-180" : ""
                 }`}
                 style={{ transformStyle: "preserve-3d" }}
               >
                 {/* Front of the card */}
-                <div className="absolute w-full h-full backface-hidden rounded overflow-hidden shadow-lg hover:scale-105 transition-transform duration-200">
+                <div
+                  className="absolute w-full h-[400px] backface-hidden rounded overflow-hidden shadow-lg hover:scale-105 transition-transform duration-200"
+                  style={{ backfaceVisibility: "hidden" }}
+                >
                   <img
                     src={book.imageUrl}
                     alt={book.title}
-                    className="w-full h-[300px] object-cover"
+                    className="w-full h-[400px] object-cover"
                   />
-                  <div className="px-4 py-2 bg-black text-white text-center">
-                    <h3 className="text-lg font-semibold">{book.title}</h3>
-                  </div>
                 </div>
-                {/* Back of the card */}
-                <div className="absolute w-full h-full backface-hidden rotate-y-180 bg-white rounded-lg shadow-lg p-4 flex flex-col justify-center items-center">
+                <div
+                  className="absolute w-full h-[400px] backface-hidden rotate-y-180 bg-white rounded-lg shadow-lg p-4 flex flex-col justify-center items-center"
+                  style={{ backfaceVisibility: "hidden" }}
+                >
                   <h2 className="text-xl font-semibold mb-2 text-center">
                     {book.title}
                   </h2>
@@ -94,12 +111,11 @@ function SimpleSlider() {
                   <p className="text-gray-700 mb-4">
                     <strong>Genre:</strong> {book.genre}
                   </p>
-                  <button
-                    className="cursor-pointer bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900"
-                    onClick={() => toggleFlip(book.id)}
-                  >
-                    Back to Cover
-                  </button>
+                  <Link href="/converter">
+                    <button className="cursor-pointer bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900">
+                      Convert
+                    </button>
+                  </Link>
                 </div>
               </div>
             </div>

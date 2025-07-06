@@ -9,7 +9,7 @@ const Footer = () => {
           <h1 className="text-2xl font-bold mb-2">AudioBook Maker</h1>
           <p className="text-gray-400 text-sm">
             Turn your books into highly customizable audiobooks!
-            <br/>
+            <br />
             Free forever, no ads, no limits.
           </p>
         </div>
@@ -28,18 +28,21 @@ const Footer = () => {
             </li>
           </ul>
         </div>
-
         <div>
           <h3 className="text-lg font-semibold mb-2">Made By</h3>
           <div className="flex mt-2 flex-col gap-4">
-            <a href="#" className="flex flex-col">
+            <div className="flex flex-col">
               <span className="font-semibold">Minh Nguyen</span>
-              <span>khaiminhnguyen1902@gmail.com</span>
-            </a>
-            <a href="#" className="flex flex-col">
+              <a href="mailto:khaiminhnguyen1902@gmail.com">
+                khaiminhnguyen1902@gmail.com
+              </a>
+            </div>
+            <div className="flex flex-col">
               <span className="font-semibold">Arush Y</span>
-              <span>arush.yadlapati@gmail.com</span>
-            </a>
+              <a href="mailto:arush.yadlapati@gmail.com">
+                arush.yadlapati@gmail.com
+              </a>
+            </div>
           </div>
         </div>
       </div>
