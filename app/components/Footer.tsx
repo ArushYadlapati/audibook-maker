@@ -9,7 +9,7 @@ const Footer = () => {
           <h1 className="text-2xl font-bold mb-2">AudioBook Maker</h1>
           <p className="text-gray-400 text-sm">
             Turn your books into highly customizable audiobooks!
-            <br/>
+            <br />
             Free forever, no ads, no limits.
           </p>
         </div>
@@ -28,7 +28,6 @@ const Footer = () => {
             </li>
           </ul>
         </div>
-
         <div>
           <h3 className="text-lg font-semibold mb-2">Made By</h3>
           <div className="flex mt-2 flex-col gap-4">
