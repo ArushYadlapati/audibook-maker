@@ -17,7 +17,7 @@ const Navbar = () => {
           }`}
         >
           <Link href="/">
-            <h1 className="text-3xl font-bold ml-10">Audio Book Maker</h1>
+            <h1 className="text-3xl font-bold ml-10">AudioBook Maker</h1>
           </Link>
         </div>
         <div className="flex gap-4 mr-10">

@@ -3,19 +3,21 @@
 import React, {useEffect, useRef, useState} from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { AlertCircle, CheckCircle, Play, Settings, Square, Upload, SkipBack, SkipForward } from "lucide-react";
+import { AlertCircle, CheckCircle, Play, Settings, Square, Upload, SkipBack, SkipForward, Database } from "lucide-react";
 
 import { PDFLib, LameJS } from "./convertHandler";
+import {parseBookInfo} from "@/app/api/bookParser";
+import {BookInfo} from "@/app/api/book";
 
 const Converter = () => {
     const [file, setFile] = useState<File | null>(null);
     const [extractedText, setExtractedText] = useState<string>("");
     const [isExtracting, setIsExtracting] = useState<boolean>(false);
     const [, setAudioBlob] = useState<Blob | null>(null);
-    const [, setAudioUrl] = useState<string>('');
+    const [, setAudioUrl] = useState<string>("");
     const [, setCurrentUtterance] = useState<SpeechSynthesisUtterance | null>(null);
     const [progress, setProgress] = useState<number>(0);
-    const [volume, setVolume] = useState<number>(0.8);
+    const [volume, setVolume] = useState<number>(1.0);
     const [rate, setRate] = useState<number>(1);
     const [pitch, setPitch] = useState<number>(1);
     const [voice, setVoice] = useState<SpeechSynthesisVoice | null>(null);
@@ -32,6 +34,12 @@ const Converter = () => {
     const [, setLamejsLib] = useState<LameJS | null>(null);
     const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
     const [highlightedText, setHighlightedText] = useState<string>("");
+    const [bookInfo, setBookInfo] = useState<BookInfo | null>(null);
+    const [coverImage, setCoverImage] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadSuccess, setUploadSuccess] = useState("");
+    const [uploadError, setUploadError] = useState("");
+    const [showUploadModal, setShowUploadModal] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -124,31 +132,33 @@ const Converter = () => {
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const uploadedFile = event.target.files?.[0];
-        if (!uploadedFile) return;
+        if (!uploadedFile) {
+            return;
+        }
 
-        const fileName = uploadedFile.name.toLowerCase();
-        const validTypes = [".pdf", ".epub", ".txt"];
-        const isValidType = validTypes.some(type => fileName.endsWith(type)) ||
-            uploadedFile.type.includes('pdf') ||
-            uploadedFile.type.includes('text');
+        const parsedFile = parseBookInfo(uploadedFile.name.toLowerCase());
+        const fileName = parsedFile.bookName || "";
+        const authorName = parsedFile.authorName || "";
+        const type = parsedFile.type || "";
+        const validTypes = ["pdf", "epub", "txt"];
 
-        if (!isValidType) {
-            setError('Please upload a PDF, EPUB, or TXT file');
+        if (!validTypes.includes(type)) {
+            setError("Please upload a PDF, EPUB, or TXT file");
             return;
         }
 
         setFile(uploadedFile);
-        setError('');
-        setSuccess('');
-        setAudioUrl('');
+        setError("");
+        setSuccess("");
+        setAudioUrl("");
         setAudioBlob(null);
-        setExtractedText('');
+        setExtractedText("");
         setProgress(0);
         setCurrentChunkIndex(0);
         setSavedChunkIndex(0);
         setSavedWordIndex(0);
         setCurrentWordIndex(0);
-        setHighlightedText('');
+        setHighlightedText("");
     };
 
     const extractTextFromPDF = async (file: File): Promise<string> => {
@@ -181,7 +191,7 @@ const Converter = () => {
     const extractTextFromEPUB = async (file: File): Promise<string> => {
         try {
             const JSZip = await new Promise<any>((resolve) => {
-                const script = document.createElement('script');
+                const script = document.createElement("script");
                 script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
                 script.onload = () => {
                     if (window.JSZip) {
@@ -195,7 +205,7 @@ const Converter = () => {
             const zip = new JSZip();
             const contents = await zip.loadAsync(file);
 
-            let fullText = '';
+            let fullText = "";
             const htmlFiles: string[] = [];
 
             contents.forEach((relativePath: string, zipEntry: any) => {
@@ -207,16 +217,16 @@ const Converter = () => {
             htmlFiles.sort();
 
             for (let i = 0; i < htmlFiles.length; i++) {
-                const htmlContent = await contents.file(htmlFiles[i]).async('string');
+                const htmlContent = await contents.file(htmlFiles[i]).async("string");
 
-                const tempDiv = document.createElement('div');
+                const tempDiv = document.createElement("div");
                 tempDiv.innerHTML = htmlContent;
 
-                const scripts = tempDiv.querySelectorAll('script, style');
+                const scripts = tempDiv.querySelectorAll("script, style");
                 scripts.forEach(el => el.remove());
 
-                const text = tempDiv.textContent || tempDiv.innerText || '';
-                fullText += text + '\n\n';
+                const text = tempDiv.textContent || tempDiv.innerText || "";
+                fullText += text + "\n\n";
 
                 setProgress(((i + 1) / htmlFiles.length) * 100);
             }
@@ -236,29 +246,35 @@ const Converter = () => {
     };
 
     const extractText = async () => {
-        if (!file) return;
+        if (!file) {
+            return;
+        }
 
         setIsExtracting(true);
-        setError('');
-        setSuccess('');
+        setError("");
+        setSuccess("");
         setProgress(0);
 
         try {
-            let text = '';
-            const fileName = file.name.toLowerCase();
+            let text = "";
+            const parsedFile = parseBookInfo(file.name.toLowerCase());
+            const bookName = parsedFile.bookName || "";
+            const authorName = parsedFile.authorName || "";
+            const type = parsedFile.type || "";
 
-            if (file.type.includes('pdf') || fileName.endsWith('.pdf')) {
+            if (type === "pdf" || bookName.endsWith('.pdf')) {
                 text = await extractTextFromPDF(file);
-            } else if (fileName.endsWith('.epub')) {
+            } else if (type === "epub" || bookName.endsWith('.epub')) {
                 text = await extractTextFromEPUB(file);
-            } else if (fileName.endsWith('.txt') || file.type.includes('text')) {
+            } else if (type === "txt" || bookName.endsWith('.txt')) {
                 text = await extractTextFromTXT(file);
             }
 
             text = cleanText(text);
 
+            setBookInfo({ bookName: bookName, authorName: authorName, type: type });
             setExtractedText(text);
-            setSuccess(`Text extracted successfully! (${text.length} characters)`);
+            setSuccess(`Text converted to audiobook successfully! (${text.length} characters)`);
 
             const chunks = splitTextIntoChunks(text);
             setTextChunks(chunks);
@@ -267,11 +283,8 @@ const Converter = () => {
             setSavedWordIndex(0);
             setCurrentWordIndex(0);
 
-            console.log(`Created ${chunks.length} chunks from ${text.length} characters`);
-
         } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-            setError(`Failed to extract text: ${errorMessage}`);
+            setError(`Failed to convert to audiobook.`);
         } finally {
             setIsExtracting(false);
             setProgress(0);
@@ -509,6 +522,44 @@ const Converter = () => {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
+    const uploadToMongoDB = async () => {
+        if (!extractedText || !bookInfo) {
+            setUploadError('Please convert text first');
+            return;
+        }
+
+        setIsUploading(true);
+        setUploadError('');
+        setUploadSuccess('');
+
+        try {
+            const response = await fetch('/api/books', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    bookName: bookInfo.bookName,
+                    authorName: bookInfo.authorName,
+                    bookText: extractedText,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                setUploadSuccess(`"${bookInfo.bookName}" was successfully  uploaded to the Library!`);
+                setShowUploadModal(false);
+            } else {
+                setUploadError(data.message || "Failed to upload book");
+            }
+        } catch (error) {
+            setUploadError("Failed to upload book.");
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50">
             <Navbar />
@@ -516,6 +567,12 @@ const Converter = () => {
             <div className="container mx-auto px-4 py-8 max-w-4xl">
                 <div className="bg-white rounded-lg shadow-lg p-6">
                     <div className="mb-6">
+                        <div className="flex justify-center">
+                            <h1 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                                AudioBook Converter
+                            </h1>
+                        </div>
+
                         <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
                             <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,.epub,.txt" className="hidden"/>
                             <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -530,8 +587,11 @@ const Converter = () => {
 
                             {file && (
                                 <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                                    <p className="text-sm font-medium">
-                                        {file.name}
+                                    <p className="text-xl font-bold font-">
+                                        {parseBookInfo(file.name.toLowerCase()).bookName}
+                                    </p>
+                                    <p className="text-sm font-">
+                                        by {parseBookInfo(file.name.toLowerCase()).authorName}
                                     </p>
                                     <p className="text-xs text-gray-500">
                                         {formatFileSize(file.size)}
@@ -560,14 +620,59 @@ const Converter = () => {
                     )}
 
                     {file && !extractedText && (
-                        <div className="mb-6">
+                        <div className="mb-6 flex justify-center">
                             <button
                                 onClick={extractText}
                                 disabled={isExtracting}
                                 className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
                             >
-                                {isExtracting ? "Extracting..." : "Extract Text"}
+                                {isExtracting ? "Converting..." : "Convert to AudioBook"}
                             </button>
+                        </div>
+                    )}
+
+                    {extractedText && (
+                        <div className="mb-6 flex justify-center gap-4">
+                            <button
+                                onClick={() => setShowUploadModal(true)}
+                                disabled={isUploading}
+                                className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+                            >
+                                <Database className="w-4 h-4" />
+                                {isUploading ? 'Uploading...' : 'Upload to Database'}
+                            </button>
+                        </div>
+                    )}
+
+                    {success && (
+                        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg flex items-center gap-2">
+                            <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                            <span>
+                                {success}
+                            </span>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center gap-2">
+                            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                            <span>
+                                {error}
+                            </span>
+                        </div>
+                    )}
+
+                    {uploadSuccess && (
+                        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg flex items-center gap-2">
+                            <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                            <span>{uploadSuccess}</span>
+                        </div>
+                    )}
+
+                    {uploadError && (
+                        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center gap-2">
+                            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                            <span>{uploadError}</span>
                         </div>
                     )}
 
@@ -594,38 +699,20 @@ const Converter = () => {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1">Speed: {rate}x</label>
-                                    <input
-                                        type="range"
-                                        min="0.5"
-                                        max="2"
-                                        step="0.1"
-                                        value={rate}
-                                        onChange={(e) => setRate(parseFloat(e.target.value))}
-                                        className="w-full"
+                                    <input type="range" min="0.5" max="2" step="0.1" value={rate} className="w-full"
+                                           onChange={(e) => setRate(parseFloat(e.target.value))}
                                     />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1">Pitch: {pitch}</label>
-                                    <input
-                                        type="range"
-                                        min="0.5"
-                                        max="2"
-                                        step="0.1"
-                                        value={pitch}
-                                        onChange={(e) => setPitch(parseFloat(e.target.value))}
-                                        className="w-full"
+                                    <input type="range" min="0.5" max="2" step="0.1" value={pitch} className="w-full"
+                                           onChange={(e) => setPitch(parseFloat(e.target.value))}
                                     />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1">Volume: {Math.round(volume * 100)}%</label>
-                                    <input
-                                        type="range"
-                                        min="0"
-                                        max="1"
-                                        step="0.1"
-                                        value={volume}
-                                        onChange={(e) => setVolume(parseFloat(e.target.value))}
-                                        className="w-full"
+                                    <input type="range" min="0" max="1" step="0.1" value={volume} className="w-full"
+                                           onChange={(e) => setVolume(parseFloat(e.target.value))}
                                     />
                                 </div>
                             </div>
@@ -697,22 +784,40 @@ const Converter = () => {
                         </div>
                     )}
 
-                    {success && (
-                        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg flex items-center gap-2">
-                            <CheckCircle className="w-5 h-5 flex-shrink-0" />
-                            <span>{success}</span>
-                        </div>
-                    )}
-
-                    {error && (
-                        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center gap-2">
-                            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                            <span>{error}</span>
-                        </div>
-                    )}
-
                 </div>
             </div>
+
+            {showUploadModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                        <h3 className="text-lg font-semibold mb-4">Upload Book to Database</h3>
+                        <div className="mb-4">
+                            <p className="text-sm text-gray-600 mb-2">Book Details:</p>
+                            <p className="font-medium">{bookInfo?.bookName}</p>
+                            <p className="text-sm text-gray-500">by {bookInfo?.authorName}</p>
+                            <p className="text-xs text-gray-400 mt-1">
+                                {extractedText.length.toLocaleString()} characters
+                            </p>
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowUploadModal(false)}
+                                className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={uploadToMongoDB}
+                                disabled={isUploading}
+                                className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                            >
+                                {isUploading ? 'Uploading...' : 'Upload'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <Footer/>
         </div>
     );
