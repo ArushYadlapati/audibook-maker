@@ -9,7 +9,6 @@ import { PDFLib, LameJS } from "./convertHandler";
 import {parseBookInfo} from "@/app/api/bookParser";
 import {BookInfo} from "@/app/api/book";
 
-import { useRouter, useSearchParams } from 'next/navigation';
 
 const Converter = () => {
     const [file, setFile] = useState<File | null>(null);
@@ -35,9 +34,9 @@ const Converter = () => {
     const [pdfLib, setPdfLib] = useState<PDFLib | null>(null);
     const [, setLamejsLib] = useState<LameJS | null>(null);
     const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
+    const [wordTrackingInterval, setWordTrackingInterval] = useState<NodeJS.Timeout | null>(null);
     const [highlightedText, setHighlightedText] = useState<string>("");
     const [bookInfo, setBookInfo] = useState<BookInfo | null>(null);
-    const [coverImage, setCoverImage] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadSuccess, setUploadSuccess] = useState("");
     const [uploadError, setUploadError] = useState("");
@@ -140,8 +139,6 @@ const Converter = () => {
         }
 
         const parsedFile = parseBookInfo(uploadedFile.name.toLowerCase());
-        const fileName = parsedFile.bookName || "";
-        const authorName = parsedFile.authorName || "";
         const type = parsedFile.type || "";
         const validTypes = ["pdf", "epub", "txt"];
 
@@ -423,20 +420,19 @@ const Converter = () => {
 
             if (!isPlayingRef.current) {
                 setSavedChunkIndex(currentIndex);
-                setSavedWordIndex(currentWordIndex);
+                setSavedWordIndex(skipToWord);
                 return;
             }
 
             const chunk = textChunks[currentIndex];
-            const words = chunk.split(/(\s+)/).filter(word => word.trim().length > 0);
+            const words = chunk.split(' ').filter(word => word.trim().length > 0);
+
+            setCurrentWordIndex(skipToWord);
 
             let textToSpeak = chunk;
-            let wordOffset = 0;
-
-            if (skipToWord > 0) {
+            if (skipToWord > 0 && skipToWord < words.length) {
                 const wordsToSpeak = words.slice(skipToWord);
                 textToSpeak = wordsToSpeak.join(' ');
-                wordOffset = skipToWord;
             }
 
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
@@ -446,11 +442,25 @@ const Converter = () => {
             utterance.pitch = pitch;
             utterance.volume = volume;
 
-            let wordIndex = wordOffset;
+            let wordBoundaryCount = 0;
+            let lastBoundaryTime = performance.now();
+
             utterance.onboundary = (event) => {
                 if (event.name === 'word' && isPlayingRef.current) {
-                    setCurrentWordIndex(wordIndex);
-                    wordIndex++;
+                    const currentTime = performance.now();
+
+                    if (currentTime - lastBoundaryTime > 50) {
+                        const actualWordIndex = skipToWord + wordBoundaryCount;
+
+                        if (actualWordIndex < words.length) {
+                            setCurrentWordIndex(actualWordIndex);
+                            setSavedWordIndex(actualWordIndex);
+                            setSavedChunkIndex(currentIndex);
+                            wordBoundaryCount++;
+                        }
+
+                        lastBoundaryTime = currentTime;
+                    }
                 }
             };
 
@@ -461,11 +471,12 @@ const Converter = () => {
                     setSavedChunkIndex(currentIndex);
                     setSavedWordIndex(0);
                     setCurrentWordIndex(0);
-                    setTimeout(() => speakChunk(0), 200);
+                    setTimeout(() => speakChunk(0), 100);
                 }
             };
 
-            utterance.onerror = () => {
+            utterance.onerror = (event) => {
+                console.log('Speech error:', event);
                 setIsPlaying(false);
                 isPlayingRef.current = false;
                 setSavedChunkIndex(currentIndex);
@@ -489,31 +500,31 @@ const Converter = () => {
 
     const skipBackward = () => {
         const newIndex = Math.max(0, currentChunkIndex - 1);
+        speechSynthesis.cancel();
         setCurrentChunkIndex(newIndex);
         setSavedChunkIndex(newIndex);
         setSavedWordIndex(0);
         setCurrentWordIndex(0);
 
         if (isPlaying) {
-            speechSynthesis.cancel();
             setTimeout(() => {
-                playTextLive(newIndex, 0).then();
-            }, 100);
+                playTextLive(newIndex, 0).then( );
+            }, 150);
         }
     };
 
     const skipForward = () => {
         const newIndex = Math.min(textChunks.length - 1, currentChunkIndex + 1);
+        speechSynthesis.cancel();
         setCurrentChunkIndex(newIndex);
         setSavedChunkIndex(newIndex);
         setSavedWordIndex(0);
         setCurrentWordIndex(0);
 
         if (isPlaying) {
-            speechSynthesis.cancel();
             setTimeout(() => {
                 playTextLive(newIndex, 0).then();
-            }, 100);
+            }, 150);
         }
     };
 
