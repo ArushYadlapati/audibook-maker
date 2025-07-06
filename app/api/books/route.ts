@@ -43,6 +43,35 @@ async function connectToDatabase() {
     }
 }
 
+export async function GET(request: NextRequest) {
+    try {
+        const { client, db } = await connectToDatabase();
+        const collection = db.collection('books');
+
+        const books = await collection.find({}).sort({ uploadDate: -1 }).toArray();
+
+        const serializedBooks = books.map((book: { _id: { toString: () => any; }; uploadDate: { toISOString: () => any; }; }) => ({
+            ...book,
+            _id: book._id.toString(),
+            uploadDate: book.uploadDate.toISOString()
+        }));
+
+        return NextResponse.json({
+            success: true,
+            count: books.length,
+            books: serializedBooks
+        }, { status: 200 });
+
+    } catch (error) {
+
+        return NextResponse.json({
+            success: false,
+            message: 'Failed to fetch books',
+            error: error
+        }, { status: 500 });
+    }
+}
+
 export async function POST(request: NextRequest) {
     try {
         let body;
@@ -115,7 +144,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
             {
                 message: 'Internal server error',
-                error: process.env.NODE_ENV === 'development' ? error : 'Server error occurred',
+                error: error,
                 timestamp: new Date().toISOString()
             },
             { status: 500 }

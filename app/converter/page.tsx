@@ -9,6 +9,8 @@ import { PDFLib, LameJS } from "./convertHandler";
 import {parseBookInfo} from "@/app/api/bookParser";
 import {BookInfo} from "@/app/api/book";
 
+import { useRouter, useSearchParams } from 'next/navigation';
+
 const Converter = () => {
     const [file, setFile] = useState<File | null>(null);
     const [extractedText, setExtractedText] = useState<string>("");
@@ -40,6 +42,7 @@ const Converter = () => {
     const [uploadSuccess, setUploadSuccess] = useState("");
     const [uploadError, setUploadError] = useState("");
     const [showUploadModal, setShowUploadModal] = useState(false);
+
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
