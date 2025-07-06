@@ -3,46 +3,69 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const uri = "mongodb+srv://mongoBookDB:eUEeUHDJ3rW3PcGB@books.osrfk4l.mongodb.net/?retryWrites=true&w=majority&appName=books";
 
-export async function POST(request: NextRequest) {
-    let client: MongoClient | null = null;
+let cachedClient: MongoClient | null = null;
+let cachedDb: any = null;
+
+async function connectToDatabase() {
+    if (cachedClient && cachedDb) {
+        return { client: cachedClient, db: cachedDb };
+    }
+
+    const client = new MongoClient(uri, {
+        serverApi: {
+            version: ServerApiVersion.v1,
+            strict: true,
+            deprecationErrors: true,
+        },
+        maxPoolSize: 1,
+        minPoolSize: 0,
+        maxIdleTimeMS: 30000,
+        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+        retryWrites: true,
+        retryReads: true,
+        heartbeatFrequencyMS: 10000,
+        maxStalenessSeconds: 90,
+    });
 
     try {
-        client = new MongoClient(uri, {
-            serverApi: {
-                version: ServerApiVersion.v1,
-                strict: true,
-                deprecationErrors: true,
-            },
-            tls: true,
-            tlsInsecure: false,
-            tlsAllowInvalidHostnames: false,
-            tlsAllowInvalidCertificates: false,
-            connectTimeoutMS: 30000,
-            socketTimeoutMS: 30000,
-            serverSelectionTimeoutMS: 30000,
-            maxPoolSize: 10,
-            minPoolSize: 1,
-            maxIdleTimeMS: 30000,
-            retryWrites: true,
-            retryReads: true,
-        });
-
         await client.connect();
+        const db = client.db('bookDB');
+        await db.command({ ping: 1 });
 
-        await client.db("admin").command({ ping: 1 });
+        cachedClient = client;
+        cachedDb = db;
 
-        const database = client.db('bookDB');
-        const collection = database.collection('books');
+        return { client, db };
+    } catch (error) {
+        throw error;
+    }
+}
 
-        const body = await request.json();
+export async function POST(request: NextRequest) {
+    try {
+        let body;
+        try {
+            body = await request.json();
+        } catch (jsonError) {
+            return NextResponse.json(
+                { message: 'Invalid JSON in request body' },
+                { status: 400 }
+            );
+        }
+
         const { bookName, authorName, bookText, fileName } = body;
 
         if (!bookName || !authorName || !bookText) {
             return NextResponse.json(
-                { message: 'Missing required fields' },
+                { message: 'Missing required fields: bookName, authorName, and bookText are required' },
                 { status: 400 }
             );
         }
+
+        const { client, db } = await connectToDatabase();
+        const collection = db.collection('books');
 
         const existingBook = await collection.findOne({
             bookName,
@@ -62,7 +85,8 @@ export async function POST(request: NextRequest) {
             bookText,
             fileName,
             uploadDate: new Date(),
-            textLength: bookText.length
+            textLength: bookText.length,
+            environment: process.env.NODE_ENV || 'unknown'
         };
 
         const result = await collection.insertOne(bookDocument);
@@ -70,21 +94,31 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             message: 'Book uploaded successfully',
             bookId: result.insertedId,
+            environment: process.env.NODE_ENV || 'unknown'
         }, { status: 201 });
 
     } catch (error) {
-        console.error('Error uploading book:', error);
+        if (error === 'MongoServerSelectionError') {
+            return NextResponse.json(
+                { message: 'Database connection timeout' },
+                { status: 503 }
+            );
+        }
+
+        if (error === 8000 || error === 'AtlasError') {
+            return NextResponse.json(
+                { message: 'Database authentication failed' },
+                { status: 401 }
+            );
+        }
+
         return NextResponse.json(
-            { message: 'Internal server error' },
+            {
+                message: 'Internal server error',
+                error: process.env.NODE_ENV === 'development' ? error : 'Server error occurred',
+                timestamp: new Date().toISOString()
+            },
             { status: 500 }
         );
-    } finally {
-        if (client) {
-            try {
-                await client.close();
-            } catch (closeError) {
-                console.error('Error closing MongoDB connection:', closeError);
-            }
-        }
     }
 }
