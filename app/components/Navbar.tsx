@@ -42,6 +42,11 @@ const Navbar = () => {
           >
             <div className="text-lg">Library</div>
           </Link>
+          <a href="https://github.com/ArushYadlapati/audiobook-maker" target="_blank"
+             rel="noopener noreferrer" className="font-bold hover:underline"
+          >
+            <div className="text-lg">GitHub Repo</div>
+          </a>
         </div>
       </div>
       <div className="border-b-2 border-gray-200 mt-10"></div>

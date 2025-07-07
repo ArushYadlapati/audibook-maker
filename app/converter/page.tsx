@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { AlertCircle, CheckCircle, Upload, Download, Play, Settings, Square, SkipBack, SkipForward, Database } from "lucide-react";
+import { AlertCircle, CheckCircle, Upload, Download, Play, Settings, Square, SkipBack, SkipForward, Library } from "lucide-react";
 
 import { PDFLib, LameJS } from "./convertHandler";
 import { parseBookInfo } from "@/app/converter/bookParser";
@@ -434,8 +434,7 @@ const Converter = () => {
 			});
 
 			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || "TTS download failed");
+				console.log(await response.json());
 			}
 
 			const blob = await response.blob();
@@ -791,10 +790,10 @@ const Converter = () => {
 								onClick={() => setShowUploadModal(true)}
 								disabled={isUploading}
 								className="cursor-pointer bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2">
-								<Database className="w-4 h-4" />
+								<Library className="w-4 h-4" />
 								{isUploading
 									? "Uploading..."
-									: "Upload to Database"}
+									: "Upload to Library"}
 							</button>
 
 							<button
@@ -869,7 +868,7 @@ const Converter = () => {
 						<div className="mb-6 p-4 bg-gray-50 dark:bg-gray-600 rounded-lg">
 							<h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
 								<Settings className="w-5 h-5" />
-								Voice Settings
+								AudioBook Preview Voice Settings
 							</h3>
 							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 								<div>
@@ -955,12 +954,12 @@ const Converter = () => {
 						<div className="mb-6 p-4 bg-gray-50 dark:bg-gray-600 rounded-lg">
 							<h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
 								<Settings className="w-5 h-5" />
-								Audio Download Settings
+								AudioBook Download Settings
 							</h3>
 							<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 								<div>
 									<label className="block text-sm font-medium mb-1">
-										TTS Voice
+										Download Voice
 									</label>
 									<select
 										value={selectedTTSVoice}

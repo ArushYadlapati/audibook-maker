@@ -18,7 +18,7 @@ const steps = [
     icon: <Headphones className="w-6 h-6 text-white" />,
     title: "3. Generate & Listen",
     description:
-      "Once you're satisfied with your settings, click 'Generate' to create your audiobook. You can listen to a preview and make adjustments as needed before finalizing.",
+      "Once you're satisfied with your settings, you can either listen in your browser directly or download it in a variety of formats. You can also upload it to the public Library page (no sign up needed).",
   },
 ];
 

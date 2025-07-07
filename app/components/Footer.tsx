@@ -33,17 +33,24 @@ const Footer = () => {
           <div className="flex mt-2 flex-col gap-4">
             <div className="flex flex-col">
               <span className="font-semibold">Minh Nguyen</span>
-              <a href="mailto:khaiminhnguyen1902@gmail.com">
+              <a href="mailto:khaiminhnguyen1902@gmail.com"
+                 className="underline hover:text-gray-300"
+                 target="_blank" rel="noopener noreferrer"
+              >
                 khaiminhnguyen1902@gmail.com
               </a>
             </div>
             <div className="flex flex-col">
               <span className="font-semibold">Arush Y</span>
-              <a href="mailto:arush.yadlapati@gmail.com">
+              <a href="mailto:arush.yadlapati@gmail.com"
+                 className="underline hover:text-gray-300"
+                 target="_blank" rel="noopener noreferrer"
+              >
                 arush.yadlapati@gmail.com
               </a>
             </div>
           </div>
+
         </div>
       </div>
 

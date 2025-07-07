@@ -22,10 +22,13 @@ export default function page() {
           <span className="text-blue-500">Audio</span> with Multiple Voices and
           Languages
         </h1>
+        <h2 className="text-3xl font-bold text-center mt-5">
+          <span className="text-blue-500"> Free Forever. No sign up needed. </span>
+        </h2>
         <Link href="/converter">
           <div className="flex text-center items-center justify-center mt-6 w-full mb-10">
             <span className="bg-blue-500 p-3 rounded-2xl pl-10 pr-10 text-white font-semibold text-lg hover:bg-blue-600 transition duration-300 cursor-pointer">
-              Start for Free
+              Convert Now!
             </span>
           </div>
         </Link>

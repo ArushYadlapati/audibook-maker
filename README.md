@@ -1,36 +1,25 @@
+# [AudioBook Maker](https://audiobook-maker.vercel.app/)
+
+![nhbadge](https://img.shields.io/badge/made%20for%20neighborhood-bf8f73?style=for-the-badge&logo=hackclub&logoColor=ffffff)
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
+## User Guide
+1. The [Converter page](https://audiobook-maker.vercel.app/converter) allows you to convert a text source
+(EPUB, PDF, or TXT) to an AudioBook. There is a live preview section, where you can easily skip sections. This 
+is powered my Microsoft Azure's [Cognitive Services](https://azure.microsoft.com/en-us/services/cognitive-services/text-to-speech/).
+The download process uses Google Cloud's [Text-to-Speech API](https://cloud.google.com/text-to-speech/docs/reference/rest/v1/text/synthesize),
+which has richer voices and better quality than the Microsoft Azure, but is more expensive and slower. You can choose the amount of characters to
+download, because of its limits. Additionally, you can choose to upload the book to the Library, which is public. However, users
+can't delete uploaded content at the moment.
+2. There is no login, and everything is free and public.
+3. The [Library page](https://audiobook-maker.vercel.app/library) allows you to download the .TXT of uploaded books.
+Then, you can convert them to AudioBooks using the Converter page. Again, the Library is public, so anyone can see the books.
 
-First, run the development server:
+## Authors
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- [@ArushYadlapati](https://github.com/ArushYadlapati)
+- [@Khaiminh1902](https://github.com/Khaiminh1902)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
