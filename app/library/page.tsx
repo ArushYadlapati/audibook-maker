@@ -4,18 +4,23 @@ import React, { useState, useEffect } from "react";
 import { RefreshCcw, File } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import { getCover, Book as OLBook } from "../../lib/bookCovers"; // adjust path if needed
 
-interface Book {
-  _id: string;
-  bookName: string;
-  authorName: string;
+interface Book extends OLBook {
   bookText: string;
   fileName?: string;
   uploadDate: string;
   textLength: number;
 }
 
-// Spinner component
+const BookCover = ({ src, alt }: { src: string | null; alt: string }) => (
+  <img
+    src={src || "https://via.placeholder.com/128x192?text=No+Cover"}
+    alt={alt}
+    className="w-32 h-48 object-cover rounded shadow mr-4 flex-shrink-0"
+  />
+);
+
 const Spinner = () => (
   <svg
     className="animate-spin h-4 w-4 text-white"
@@ -40,12 +45,14 @@ const Spinner = () => (
 );
 
 const Library = () => {
-  const [allBooks, setAllBooks] = useState<Book[]>([]); // all fetched books
-  const [books, setBooks] = useState<Book[]>([]); // filtered books to display
+  const [allBooks, setAllBooks] = useState<Book[]>([]);
+  const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+
+  const [coverMap, setCoverMap] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     fetchBooks();
@@ -54,18 +61,13 @@ const Library = () => {
   const fetchBooks = async () => {
     try {
       if (!loading) setRefreshing(true);
-      const response = await fetch("/api/books", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
+      const response = await fetch("/api/books");
       const data = await response.json();
 
       if (data.success) {
         setAllBooks(data.books);
         setBooks(data.books);
+        fetchCovers(data.books);
       } else {
         setError(data.message || "Failed to fetch books");
       }
@@ -81,7 +83,18 @@ const Library = () => {
     }
   };
 
-  // Handle search input change and filter books
+  // Use Open Library API for covers instead of Google Books
+  const fetchCovers = async (books: Book[]) => {
+    const newCoverMap: Record<string, string | null> = {};
+    await Promise.all(
+      books.map(async (book) => {
+        const cover = await getCover(book);
+        newCoverMap[book._id] = cover;
+      })
+    );
+    setCoverMap(newCoverMap);
+  };
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const term = e.target.value;
     setSearchTerm(term);
@@ -125,7 +138,7 @@ const Library = () => {
 
   if (loading) {
     return (
-      <div>
+      <>
         <Navbar />
         <div className="container mx-auto px-4 py-8">
           <h1 className="text-3xl font-bold mb-6">Library</h1>
@@ -134,13 +147,13 @@ const Library = () => {
           </div>
         </div>
         <Footer />
-      </div>
+      </>
     );
   }
 
   if (error) {
     return (
-      <div>
+      <>
         <Navbar />
         <div className="container mx-auto px-4 py-8">
           <h1 className="text-3xl font-bold mb-6">Library</h1>
@@ -155,17 +168,16 @@ const Library = () => {
           </div>
         </div>
         <Footer />
-      </div>
+      </>
     );
   }
 
   return (
-    <div>
+    <>
       <Navbar />
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-6">Library</h1>
 
-        {/* Search box */}
         <div className="mb-6">
           <input
             type="text"
@@ -192,39 +204,46 @@ const Library = () => {
               {books.map((book) => (
                 <div
                   key={book._id}
-                  className="border dark:border-gray-400 rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow"
+                  className="border dark:border-gray-400 rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow flex"
                 >
-                  <h3 className="text-xl font-bold mb-2">{book.bookName}</h3>
-                  <p className="text-gray-600 dark:text-gray-400 mb-2">
-                    by {book.authorName}
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                    {book.textLength.toLocaleString()} characters
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    {new Date(book.uploadDate).toLocaleDateString()}
-                  </p>
-                  <div className="text-sm text-gray-700 dark:text-gray-300 mb-4">
-                    <p className="font-medium mb-1">Preview:</p>
-                    <p className="line-clamp-3">
-                      {book.bookText.substring(0, 150)}
-                      {book.bookText.length > 150 ? "..." : ""}
-                    </p>
-                  </div>
+                  <BookCover
+                    src={coverMap[book._id] || null}
+                    alt={book.bookName}
+                  />
 
-                  <div className="flex flex-col gap-2">
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-400">
-                      Download as:
+                  <div className="flex flex-col flex-grow">
+                    <h3 className="text-xl font-bold mb-2">{book.bookName}</h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-2">
+                      by {book.authorName}
                     </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => downloadAsText(book)}
-                        className="cursor-pointer flex items-center gap-1 px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600 transition-colors"
-                        title="Download as Text"
-                      >
-                        <File size={14} />
-                        TXT
-                      </button>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                      {book.textLength.toLocaleString()} characters
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                      {new Date(book.uploadDate).toLocaleDateString()}
+                    </p>
+                    <div className="text-sm text-gray-700 dark:text-gray-300 mb-4">
+                      <p className="font-medium mb-1">Preview:</p>
+                      <p className="line-clamp-3">
+                        {book.bookText.substring(0, 150)}
+                        {book.bookText.length > 150 ? "..." : ""}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-2 mt-auto">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-400">
+                        Download as:
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => downloadAsText(book)}
+                          className="cursor-pointer flex items-center gap-1 px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600 transition-colors"
+                          title="Download as Text"
+                        >
+                          <File size={14} />
+                          TXT
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -244,7 +263,7 @@ const Library = () => {
         </div>
       </div>
       <Footer />
-    </div>
+    </>
   );
 };
 
