@@ -107,6 +107,16 @@ const Converter = () => {
   }, []);
 
   useEffect(() => {
+    if (uploadSuccess || uploadError) {
+      const timer = setTimeout(() => {
+        setShowUploadModal(false);
+      }, 0);
+
+      return () => clearTimeout(timer);
+    }
+  }, [uploadSuccess, uploadError]);
+
+  useEffect(() => {
     const loadVoices = () => {
       const availableVoices = speechSynthesis.getVoices();
       setVoices(availableVoices);
