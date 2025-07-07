@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Slider from "react-slick";
 import Link from "next/link";
-import { Book, getCover } from "../../lib/bookCovers";
+import { Book, getCover } from "@/lib/bookCovers";
 
 export default function SimpleSlider() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -90,13 +90,12 @@ export default function SimpleSlider() {
                       style={{ backfaceVisibility: "hidden" }}
                     >
                       <img
-                        src={covers[book._id] || "/fallback-book-cover.jpg"}
+                        src={covers[book._id] || "/images/fallback-book-cover.png"}
                         alt={book.bookName}
                         className="w-full h-[500px] object-cover"
                       />
                     </div>
 
-                    {/* Back */}
                     <div
                       className="absolute w-full h-[500px] backface-hidden rotate-y-180 bg-white rounded-lg shadow-lg p-4 flex flex-col justify-center items-center"
                       style={{ backfaceVisibility: "hidden" }}

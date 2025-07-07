@@ -1,5 +1,3 @@
-// lib/bookCovers.ts
-
 export type Book = {
   _id: string;
   bookName: string;
@@ -41,12 +39,16 @@ export async function fetchCoverBySearch(
 export async function getCover(book: Book): Promise<string> {
   if (book.isbn) {
     const coverByISBN = await fetchCoverByISBN(book.isbn);
-    if (coverByISBN) return coverByISBN;
+    if (coverByISBN) {
+      return coverByISBN;
+    }
   }
   const coverBySearch = await fetchCoverBySearch(
     book.bookName,
     book.authorName
   );
-  if (coverBySearch) return coverBySearch;
-  return "/fallback-book-cover.jpg";
+  if (coverBySearch) {
+    return coverBySearch;
+  }
+  return "/images/fallback-book-cover.png";
 }
