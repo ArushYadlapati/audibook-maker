@@ -3,23 +3,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import {
-  AlertCircle,
-  CheckCircle,
-  Play,
-  Settings,
-  Square,
-  Upload,
-  SkipBack,
-  SkipForward,
-  Database,
-} from "lucide-react";
+import {AlertCircle, CheckCircle, Play, Settings, Square, Upload, SkipBack, SkipForward, Database} from "lucide-react";
 
 import { PDFLib, LameJS } from "./convertHandler";
 import { parseBookInfo } from "@/app/api/bookParser";
 import { BookInfo } from "@/app/api/book";
-
-import { useRouter, useSearchParams } from "next/navigation";
 
 const Converter = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -49,7 +37,6 @@ const Converter = () => {
   const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
   const [highlightedText, setHighlightedText] = useState<string>("");
   const [bookInfo, setBookInfo] = useState<BookInfo | null>(null);
-  const [coverImage, setCoverImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState("");
   const [uploadError, setUploadError] = useState("");
@@ -120,6 +107,16 @@ const Converter = () => {
   }, []);
 
   useEffect(() => {
+    if (uploadSuccess || uploadError) {
+      const timer = setTimeout(() => {
+        setShowUploadModal(false);
+      }, 0);
+
+      return () => clearTimeout(timer);
+    }
+  }, [uploadSuccess, uploadError]);
+
+  useEffect(() => {
     const loadVoices = () => {
       const availableVoices = speechSynthesis.getVoices();
       setVoices(availableVoices);
@@ -154,8 +151,6 @@ const Converter = () => {
     }
 
     const parsedFile = parseBookInfo(uploadedFile.name.toLowerCase());
-    const fileName = parsedFile.bookName || "";
-    const authorName = parsedFile.authorName || "";
     const type = parsedFile.type || "";
     const validTypes = ["pdf", "epub", "txt"];
 
